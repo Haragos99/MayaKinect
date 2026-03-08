@@ -16,6 +16,7 @@
 
 struct JointData
 {
+	Vector4 positionKinect; // Original Kinect position (homogeneous coordinates)
     MVector position;
     MQuaternion orientation;
     MQuaternion localQuaternion;
@@ -62,8 +63,6 @@ private:
     HANDLE SkeletonStreamHandle;
     HWND  m_hWnd;
     std::vector<JointData> joints;
-    NUI_SKELETON_FRAME lastSkeletonFrame;
-    bool hasValidSkeleton = false;
     void drawLine(unsigned char* buffer, int x1, int y1, int x2, int y2, int thickness);
     void drawPixel(unsigned char* buffer, int x, int y, unsigned char r, unsigned char g, unsigned char b, int radius);
     MMatrix convertToMayaMatrix(const Matrix4& kMat);

@@ -614,19 +614,19 @@ void KinectDevice::creatSkeleton(NUI_SKELETON_DATA& skel)
         auto matrix = boneOrientation.hierarchicalRotation.rotationMatrix;
         // 1. Defensive programming: prevent divide-by-zero crashes
         float w = skel.SkeletonPositions[i].w;
-        if (w == 0.0f) 
+        if (w == 0.0f)
         {
             w = 1.0f; // Fallback to avoid NaN
         }
         JointData jd;
         jd.position = MVector(
-            skel.SkeletonPositions[i].x / w, 
+            skel.SkeletonPositions[i].x / w,
             skel.SkeletonPositions[i].y / w,
             -skel.SkeletonPositions[i].z / w
         );
-        jd.orientation = MQuaternion(q.x, q.y,-q.z, -q.w);
+        jd.orientation = MQuaternion(q.x, q.y, -q.z, -q.w);
         jd.rotation = convertToMayaMatrix(matrix);
-
+		jd.positionKinect = skel.SkeletonPositions[i];
 
 
         joints.push_back(jd);
@@ -635,7 +635,6 @@ void KinectDevice::creatSkeleton(NUI_SKELETON_DATA& skel)
 
     //calculateQuaternion();
 }
-
 
 std::vector<JointData>& KinectDevice::getLatestJoints()
 {
@@ -646,15 +645,8 @@ bool KinectDevice::getFrame(unsigned char* outBuffer)
 {
     if (!NuiSensor || hColorStream == NULL) return false;
 
-    // 1. Always try to update skeleton frame independently
-    NUI_SKELETON_FRAME skeletonFrame = { 0 };
-    if (SUCCEEDED(NuiSensor->NuiSkeletonGetNextFrame(0, &skeletonFrame)))
-    {
-        lastSkeletonFrame = skeletonFrame; // cache it
-        hasValidSkeleton = true;
-    }
 
-    // 2. Process Color Frame
+    // Process Color Frame
     if (WaitForSingleObject(NextColorEvent, 0) == WAIT_OBJECT_0)
     {
         NUI_IMAGE_FRAME imageFrame;
@@ -671,58 +663,50 @@ bool KinectDevice::getFrame(unsigned char* outBuffer)
             texture->UnlockRect(0);
             NuiSensor->NuiImageStreamReleaseFrame(hColorStream, &imageFrame);
 
-            // 3. Draw using cached skeleton (always available)
-            if (hasValidSkeleton)
+            // Draw using cached skeleton (always available)
+            POINT screenPoints[NUI_SKELETON_POSITION_COUNT];
+
+            for (int j = 0; j < joints.size(); ++j)
             {
-                for (int i = 0; i < NUI_SKELETON_COUNT; ++i)
-                {
-                    if (lastSkeletonFrame.SkeletonData[i].eTrackingState == NUI_SKELETON_TRACKED)
-                    {
-                        const NUI_SKELETON_DATA& skel = lastSkeletonFrame.SkeletonData[i];
-                        POINT screenPoints[NUI_SKELETON_POSITION_COUNT];
-
-                        for (int j = 0; j < NUI_SKELETON_POSITION_COUNT; ++j)
-                        {
-                            float fx, fy;
-                            NuiTransformSkeletonToDepthImage(skel.SkeletonPositions[j], &fx, &fy, NUI_IMAGE_RESOLUTION_640x480);
-                            screenPoints[j].x = static_cast<long>(fx + 0.5f);
-                            screenPoints[j].y = static_cast<long>(fy + 0.5f);
-                            drawPixel(outBuffer, screenPoints[j].x, screenPoints[j].y, 255, 0, 0, 5);
-                        }
-
-                        auto drawBone = [&](int joint1, int joint2) {
-                            drawLine(outBuffer,
-                                screenPoints[joint1].x, screenPoints[joint1].y,
-                                screenPoints[joint2].x, screenPoints[joint2].y, 3);
-                        };
-
-                        // Torso
-                        drawBone(NUI_SKELETON_POSITION_HEAD, NUI_SKELETON_POSITION_SHOULDER_CENTER);
-                        drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SPINE);
-                        drawBone(NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_HIP_CENTER);
-                        // Left Arm
-                        drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
-                        // Right Arm
-                        drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
-                        // Left Leg
-                        drawBone(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT);
-                        drawBone(NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
-                        // Right Leg
-                        drawBone(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT);
-                        drawBone(NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
-                    }
-                }
+                float fx, fy;
+				Vector4 pos = Vector4(joints[j].position.x, joints[j].position.y, joints[j].position.z, 1.0f);
+                NuiTransformSkeletonToDepthImage(joints[j].positionKinect, &fx, &fy, NUI_IMAGE_RESOLUTION_640x480);
+                screenPoints[j].x = static_cast<long>(fx + 0.5f);
+                screenPoints[j].y = static_cast<long>(fy + 0.5f);
+                drawPixel(outBuffer, screenPoints[j].x, screenPoints[j].y, 255, 0, 0, 5);
             }
+
+            auto drawBone = [&](int joint1, int joint2) {
+                drawLine(outBuffer,
+                    screenPoints[joint1].x, screenPoints[joint1].y,
+                    screenPoints[joint2].x, screenPoints[joint2].y, 3);
+            };
+
+            // Torso
+            drawBone(NUI_SKELETON_POSITION_HEAD, NUI_SKELETON_POSITION_SHOULDER_CENTER);
+            drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SPINE);
+            drawBone(NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_HIP_CENTER);
+            // Left Arm
+            drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_LEFT);
+            drawBone(NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT);
+            drawBone(NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT);
+            drawBone(NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
+            // Right Arm
+            drawBone(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
+            // Left Leg
+            drawBone(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_LEFT);
+            drawBone(NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT);
+            drawBone(NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT);
+            drawBone(NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
+            // Right Leg
+            drawBone(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT);
+            drawBone(NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
+
             return true;
         }
     }
