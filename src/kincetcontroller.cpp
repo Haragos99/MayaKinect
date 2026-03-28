@@ -24,20 +24,16 @@ MStatus KinectController::initKinect()
 	return MS::kSuccess;
 }
 
-
 std::vector<JointData>& KinectController::getSkeleton()
 {
 	kinect.processSkeleton();
 	return kinect.getLatestJoints();
 }
 
-
-
 bool KinectController::getImageBuffer(unsigned char* outbuffer)
 {
 	return kinect.getFrame(outbuffer);
 }
-
 
 
 void KinectController::stop()
@@ -46,17 +42,16 @@ void KinectController::stop()
 }
 
 
-
 void KinectController::updateMayaSkeleton()
 {
 	auto& joints = getSkeleton();
 	auto& kinectToMayaMap = kinect.getKinectToMayaMap();
 	auto& jointMap = skeleton.getJointMap();
-
 	auto& offsets = kinect.getOffsets();
 	auto parentMap = kinect.parent_joint_map;
 	std::vector<MVector> globalPos(joints.size());
 	std::vector<MQuaternion> globalRot(joints.size());
+
 	for (int i = 0; i < joints.size(); ++i)
 	{
 		// Find the name for this Kinect index
@@ -71,7 +66,6 @@ void KinectController::updateMayaSkeleton()
 		{
 			continue;
 		}
-
 		MObject mayaJoint = itMaya->second;
 		MFnIkJoint fnJoint(mayaJoint);
 		MFnTransform fnTrans(mayaJoint);
@@ -82,139 +76,17 @@ void KinectController::updateMayaSkeleton()
 		int parent = parentMap[i];
 
 		MEulerRotation localEuler = kinect.getEulers(i);
-
 		MQuaternion localRot = localEuler.asQuaternion();
 
-		if (parent == i) // root
-		{
-			globalPos[i] = offsets[i];
-			globalRot[i] = localRot;
-		}
-		else
-		{
-			globalRot[i] = globalRot[parent] * localRot;
-			globalPos[i] = globalPos[parent] + offsets[i].rotateBy(globalRot[parent]);
-		}
-
-		fnTrans.setTranslation(globalPos[i], MSpace::kTransform);
-		fnTrans.setRotation(globalRot[i], MSpace::kTransform);
-		//if (itName->second == "SpineBase")
+		if (itName->second == "SpineBase")
 		{
 			MVector pos = joints[i].position * 100;
 			fnTrans.setTranslation(pos, MSpace::kTransform);
 		}
-
-		/*
-
-		// 4. Apply Rotation (Hierarchical)
-		// Kinect 'hierarchicalRotation' is relative to parent, which is what Maya expects
-		MQuaternion q = joints[i].orientation * jointOrient.inverse();
-		
-
-
-		
-		MVector euler = kinect.getEulers(i);
-
-
-		double rot[3] = {
-			euler.x * 3.1415 / 180.0,
-			euler.y * 3.1415 / 180.0,
-			euler.z * 3.1415 / 180.0
-		};
-		fnJoint.setRotation(rot, MTransformationMatrix::kXYZ);
-		
-		MString msg;
-		msg += "Rotion: ";
-		msg += rot[0];
-		msg += " | ";
-		msg += rot[1];
-		msg += " | ";
-		msg += rot[2];
-
-
-		MGlobal::displayInfo(itName->second.c_str());
-
-		MGlobal::displayInfo(msg);
-		MGlobal::displayInfo("-----------------------------------");
-		// Note: You may need to flip the rotation depending on Maya's joint orientation
-		//fnTrans.setRotation(q, MSpace::kTransform);
-
-
-
-
-
-		
-		//applyRotation(itName->second.c_str(), joints[i].orientation);
-		const MMatrix& m = joints[i].rotation;
-
-		// In T-pose all hierarchical rotations should be near identity
-		// Identity = diagonal is 1, rest is 0
-		double diagSum = m[0][0] + m[1][1] + m[2][2]; // should be ~3.0
-
-		MString msgl;
-		msgl += itName->second.c_str();
-		msgl += "  diagonal sum (should be ~3.0): ";
-		msgl += diagSum;
-
-		if (diagSum < 2.8)
-			MGlobal::displayWarning("!! NOT IDENTITY: " + msgl);
 		else
-			MGlobal::displayInfo("OK: " + msgl);
-
-
-		//applyRotation(itName->second.c_str(), joints[i].rotation);
-		MVector pos = joints[i].position * 100.0;
-		//fnTrans.setTranslation(pos, MSpace::kWorld);
-
-
-		MVector scaledPosition(
-			joints[i].position.x,
-			joints[i].position.y,
-			joints[i].position.z
-		);
-		MString msg;
-		msg += "Quaternion: ";
-		msg += (float)q.x;
-		msg += " | ";
-		msg += (float)q.y;
-		msg += " | ";
-		msg += (float)q.z;
-		msg += " | ";
-		msg += (float)q.w;
-
-
-		MGlobal::displayInfo(itName->second.c_str());
-
-		MGlobal::displayInfo(msg);
-
-		MString msg2;
-		msg2 += "Position: ";
-		msg2 += (float)joints[i].position.x;
-		msg2 += " | ";
-		msg2 += (float)joints[i].position.y;
-		msg2 += " | ";
-		msg2 += (float)joints[i].position.z;
-		//fnTrans.setTranslation(joints[i].position, MSpace::kWorld);
-
-		MGlobal::displayInfo(msg2);
-		MVector currentWorld = fnTrans.translation(MSpace::kWorld);\
-		MString msg3;
-		msg3 += "Position: ";
-		msg3 += (float)currentWorld.x;
-		msg3 += " | ";
-		msg3 += (float)currentWorld.y;
-		msg3 += " | ";
-		msg3 += (float)currentWorld.z;
-
-		MGlobal::displayInfo(msg3);
-		MGlobal::displayInfo("-----------------------------------");
-
-
-		// Force EVERY joint to the exact world space coordinate.
-		// Warning: This will overwrite local bone lengths!
-
-		*/
-		
+		{
+			fnTrans.setRotation(localRot, MSpace::kTransform);
+		}
 	}
 }
 
@@ -309,7 +181,6 @@ void KinectController::updateDebugSpheres()
 			globalRot[i] = globalRot[parent] * localRot;
 			globalPos[i] = globalPos[parent] + offsets[i].rotateBy(globalRot[parent]);
 		}
-
 
 
 		MFnTransform fnTrans(debugSpheres[i]);

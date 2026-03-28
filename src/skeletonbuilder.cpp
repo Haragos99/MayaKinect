@@ -87,7 +87,7 @@ MObject SkeletonBuilder::createJoint(const MString& name,
     MStatus status;
 
     MFnIkJoint jointFn;
-    MObject joint = jointFn.create(MObject::kNullObj, &status);
+    MObject joint = jointFn.create(parent, &status);
 
     if (!status)
     {

@@ -13,7 +13,6 @@ MStatus KinectUpdateSkeletonCmd::doIt(const MArgList& args)
 
     auto& controller = KinectController::instance();
     controller.updateMayaSkeleton();
-   // controller.updateDebugSpheres();
     bool status = controller.getImageBuffer(outBuffer);
     setResult(status);
     return MS::kSuccess;

@@ -24,6 +24,7 @@ struct JointData
     MAngle eulerX;
     MAngle eulerY;
     MAngle eulerZ;
+    Vector4 quat;
 };
 
 struct KinectFrame
@@ -36,6 +37,8 @@ struct KinectFrame
 };
 
 
+const double PI = 3.14159265358979323846;
+
 class KinectDevice
 {
 public:
@@ -47,7 +50,7 @@ public:
     void creatSkeleton(NUI_SKELETON_DATA& skel);
     std::vector<JointData>& getLatestJoints();
     bool getFrame(unsigned char* outBuffer);
-    MVector getEulers(int idx);
+    MEulerRotation getEulers(int idx);
     void calculateQuaternion();
     void initoffsets();
     static const int parent_joint_map[NUI_SKELETON_POSITION_COUNT];
@@ -74,17 +77,11 @@ private:
 
     std::vector<MVector> offsets;
 
-
-    void calculateQuaternion2();
-    MQuaternion getDeltaQuat(int idx);
-
-
     // helpers
     MVector   buildAxis(const MVector& a, const MVector& b);
     MMatrix   matFromAxes(const MVector& vx, const MVector& vy, const MVector& vz);
     MMatrix   bindPoseInverse(float rx, float ry, float rz);
     MQuaternion matToQuat(const MMatrix& m);
-
 
 
     // Map Kinect v1 Indices to your Maya joint names
