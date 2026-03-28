@@ -4,6 +4,11 @@
 ## Overview
 This project provides a **Maya C++ UI integrated with Python** for realtime motion capture streaming from Kinect devices into Autodesk Maya. It enables live skeletal data capture and animation mapping inside Maya for prototyping and animation workflows.
 
+
+## Result
+![kinect  example](resources/kinect.gif)
+
+
 ## Features
 - Realtime motion capture streaming from Kinect 360
 - Maya UI built with C++ and Python integration
