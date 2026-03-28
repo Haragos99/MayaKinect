@@ -28,61 +28,6 @@ const int KinectDevice::parent_joint_map[NUI_SKELETON_POSITION_COUNT] =
 };
 
 
-
-
-bool checkindex(_NUI_SKELETON_POSITION_INDEX index)
-{
-    switch (index)
-    {
-    case NUI_SKELETON_POSITION_HIP_CENTER:
-        return false;
-    case NUI_SKELETON_POSITION_SPINE:
-        return false;
-    case NUI_SKELETON_POSITION_SHOULDER_CENTER:
-        return false;
-    case NUI_SKELETON_POSITION_HEAD:
-        return true;
-    case NUI_SKELETON_POSITION_SHOULDER_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_ELBOW_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_WRIST_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_HAND_LEFT:
-        return false;
-    case NUI_SKELETON_POSITION_SHOULDER_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_ELBOW_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_WRIST_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_HAND_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_HIP_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_KNEE_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_ANKLE_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_FOOT_LEFT:
-        return true;
-    case NUI_SKELETON_POSITION_HIP_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_KNEE_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_ANKLE_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_FOOT_RIGHT:
-        return true;
-    case NUI_SKELETON_POSITION_COUNT:
-        return false;
-    default:
-        return false;
-    }
-}
-
-
-
 HRESULT KinectDevice::initialize()
 {
     INuiSensor* pNuiSensor;
@@ -216,82 +161,6 @@ MMatrix KinectDevice::convertToMayaMatrix(const Matrix4& kMat)
 
     return mayaMat;
 }
-
-// Build a direction vector from two joint positions
-MVector KinectDevice::buildAxis(const MVector& a, const MVector& b)
-{
-    return MVector(b.x - a.x, b.y - a.y, b.z - a.z);
-}
-
-// Build rotation matrix from X and Y axes (Z computed via cross)
-// Mirrors mat3_from_axis logic from your reference code
-MMatrix KinectDevice::matFromAxes(const MVector& vx, const MVector& vy, const MVector& vz)
-{
-    MVector r0, r1, r2;
-
-    // YZ plane (vx is zero) 
-    if (vx.x == 0 && vx.y == 0 && vx.z == 0)
-    {
-        r1 = vy.normal();
-        r0 = (vy ^ vz).normal();        // cross(vy, vz)
-        r2 = (r0 ^ r1).normal();        // cross(r0, r1)
-    }
-    // XZ plane (vy is zero)
-    else if (vy.x == 0 && vy.y == 0 && vy.z == 0)
-    {
-        r0 = vx.normal();
-        r1 = (vz ^ vx).normal();        // cross(vz, vx)
-        r2 = (r0 ^ r1).normal();        // cross(r0, r1)
-    }
-    // XY plane (vz is zero)  original code's most used path 
-    else if (vz.x == 0 && vz.y == 0 && vz.z == 0)
-    {
-        r1 = vy.normal();
-        r2 = (vx.normal() ^ r1).normal(); // cross(normalize(vx), r1)
-        r0 = (r1 ^ r2).normal();          // cross(r1, r2)
-    }
-    else
-    {
-        // All axes provided  just normalize
-        r0 = vx.normal();
-        r1 = vy.normal();
-        r2 = vz.normal();
-    }
-
-    double m[4][4] =
-    {
-        { r0.x, r0.y, r0.z, 0.0 },
-        { r1.x, r1.y, r1.z, 0.0 },
-        { r2.x, r2.y, r2.z, 0.0 },
-        { 0.0,  0.0,  0.0,  1.0 }
-    };
-    return MMatrix(m);
-}
-
-// Build an inverse bind pose matrix from euler angles (degrees)
-// Mirrors mat3_inverse(mat3_rotation_*(angle)) from reference
-MMatrix KinectDevice::bindPoseInverse(float rx, float ry, float rz)
-{
-    MTransformationMatrix tm;
-    double rot[3] = {
-        rx * 3.1415 / 180.0,
-        ry * 3.1415 / 180.0,
-        rz * 3.1415 / 180.0
-    };
-    tm.setRotation(rot, MTransformationMatrix::kXYZ);
-    return tm.asMatrix().inverse();
-}
-
-// Extract quaternion from matrix
-MQuaternion KinectDevice::matToQuat(const MMatrix& m)
-{
-    MTransformationMatrix tm(m);
-    MQuaternion q = tm.rotation();
-    q.normalizeIt();
-    return q;
-}
-
-
 
 void KinectDevice::initoffsets()
 {
@@ -528,6 +397,16 @@ void KinectDevice::drawLine(unsigned char* buffer, int x1, int y1, int x2, int y
             }
         }
     }
+}
+
+
+// Extract quaternion from matrix
+MQuaternion KinectDevice::matToQuat(const MMatrix& m)
+{
+    MTransformationMatrix tm(m);
+    MQuaternion q = tm.rotation();
+    q.normalizeIt();
+    return q;
 }
 
 

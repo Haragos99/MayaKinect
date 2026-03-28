@@ -27,16 +27,6 @@ struct JointData
     Vector4 quat;
 };
 
-struct KinectFrame
-{
-    std::array<JointData, 20> joints;
-    std::vector<unsigned char> colorBuffer;
-    int width;
-    int height;
-    double timestamp;
-};
-
-
 const double PI = 3.14159265358979323846;
 
 class KinectDevice
@@ -69,21 +59,8 @@ private:
     void drawLine(unsigned char* buffer, int x1, int y1, int x2, int y2, int thickness);
     void drawPixel(unsigned char* buffer, int x, int y, unsigned char r, unsigned char g, unsigned char b, int radius);
     MMatrix convertToMayaMatrix(const Matrix4& kMat);
-    // Maps each joint index to its parent joint index
-    // Matches Kinect's skeleton hierarchy exactly
-    
-    // Stores last stable cross product per joint to prevent gimbal/instability
-    MVector last_stable_vx[NUI_SKELETON_POSITION_COUNT];
-
     std::vector<MVector> offsets;
-
-    // helpers
-    MVector   buildAxis(const MVector& a, const MVector& b);
-    MMatrix   matFromAxes(const MVector& vx, const MVector& vy, const MVector& vz);
-    MMatrix   bindPoseInverse(float rx, float ry, float rz);
     MQuaternion matToQuat(const MMatrix& m);
-
-
     // Map Kinect v1 Indices to your Maya joint names
     std::map<int, std::string> kinectToMayaMap = {
         { NUI_SKELETON_POSITION_HIP_CENTER,      "SpineBase" },
