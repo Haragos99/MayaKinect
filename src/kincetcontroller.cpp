@@ -6,6 +6,7 @@
 KinectController::KinectController()
 {
 	//skeleton.createSkeleton();
+	MGlobal::displayInfo("KinectController initialized");
 
 }
 
@@ -20,7 +21,12 @@ MStatus KinectController::initKinect()
 	}
 
 	MGlobal::displayInfo("Kinect Connected ");
-	skeleton.createSkeleton();
+	if (!skeleton.skeletonExists())
+	{
+		MGlobal::displayInfo("Kinect skeleton not found in scene. Creating new skeleton...");
+		skeleton.createSkeleton();
+	}
+	
 	return MS::kSuccess;
 }
 

@@ -51,16 +51,11 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         self.image_buffer = ctypes.create_string_buffer(self.buffer_size)
         self.memory_address = str(ctypes.addressof(self.image_buffer))
 
-        # Try to init hardware
-        try:
-            cmds.runMayaKinect()
-        except Exception as e:
-            self.image_label.setText("Plugin not found or Kinect disconnected!")
+
 
         # Timer setup (Starts active by default)
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.update_frame)
-        self.timer.start(33)
 
         # Button Connections
         self.start_btn.clicked.connect(self.start_stream)
@@ -69,33 +64,42 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
     def start_stream(self):
         if not self.timer.isActive():
             self.timer.start(33)
+
+            # Try to init hardware
+            try:
+                cmds.runMayaKinect()
+            except Exception as e:
+                self.image_label.setText("Plugin not found or Kinect disconnected!")
+
             print("Kinect Stream Started")
 
     def stop_stream(self):
         if self.timer.isActive():
             self.timer.stop()
             self.image_label.setText("Stream Paused")
+            cmds.closeKinect()
             print("Kinect Stream Stopped")
 
     def update_frame(self):
-        # Call C++ command
-        success = cmds.updateMayaKinect(self.memory_address)
-        
-        if success:
-            q_img = QtGui.QImage(
-                self.image_buffer, 
-                640, 480, 
-                QtGui.QImage.Format_RGB32
-            )
+        if self.timer.isActive():
+            # Call C++ command
+            success = cmds.updateMayaKinect(self.memory_address)
             
-            # Use SmoothTransformation if user resizes the window
-            pixmap = QtGui.QPixmap.fromImage(q_img)
-            scaled_pixmap = pixmap.scaled(
-                self.image_label.size(), 
-                QtCore.Qt.KeepAspectRatio, 
-                QtCore.Qt.SmoothTransformation
-            )
-            self.image_label.setPixmap(scaled_pixmap)
+            if success:
+                q_img = QtGui.QImage(
+                    self.image_buffer, 
+                    640, 480, 
+                    QtGui.QImage.Format_RGB32
+                )
+                
+                # Use SmoothTransformation if user resizes the window
+                pixmap = QtGui.QPixmap.fromImage(q_img)
+                scaled_pixmap = pixmap.scaled(
+                    self.image_label.size(), 
+                    QtCore.Qt.KeepAspectRatio, 
+                    QtCore.Qt.SmoothTransformation
+                )
+                self.image_label.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
         if hasattr(self, 'timer'):

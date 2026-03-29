@@ -4,12 +4,13 @@
 #include <maya/MFnIkJoint.h>
 #include <maya/MVector.h>
 #include <maya/MGlobal.h>
+#include <maya/MSelectionList.h>
 
 class SkeletonBuilder
 {
 public:
     void createSkeleton();
-
+    bool skeletonExists() const;
     MObject& getJoint(const std::string& name);
     std::map<std::string, MObject>& getJointMap() { return m_jointMap; }
 

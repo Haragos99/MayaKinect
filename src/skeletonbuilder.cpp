@@ -1,4 +1,41 @@
 #include "skeletonbuilder.h"
+#include <vector>
+
+bool SkeletonBuilder::skeletonExists() const
+{
+    static const std::vector<std::string> k_expectedJoints = {
+        "SpineBase", "SpineMid", "SpineShoulder", "Neck", "Head",
+        "ShoulderLeft", "ElbowLeft", "WristLeft", "HandLeft",
+        "ShoulderRight", "ElbowRight", "WristRight", "HandRight",
+        "HipLeft", "KneeLeft", "AnkleLeft", "FootLeft",
+        "HipRight", "KneeRight", "AnkleRight", "FootRight"
+    };
+
+    for (const auto& name : k_expectedJoints)
+    {
+        MSelectionList sel;
+        MStatus status = sel.add(name.c_str());
+        if (status != MS::kSuccess || sel.isEmpty())
+        {
+            return false;
+        }
+
+        MObject node;
+        sel.getDependNode(0, node);
+        if (!node.hasFn(MFn::kJoint))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+
+
+
+
 
 void SkeletonBuilder::createSkeleton()
 {
