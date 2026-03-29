@@ -21,14 +21,27 @@ MStatus KinectController::initKinect()
 	}
 
 	MGlobal::displayInfo("Kinect Connected ");
+	createSkeleton();
+	
+	return MS::kSuccess;
+}
+
+
+
+void KinectController::createSkeleton()
+{
 	if (!skeleton.skeletonExists())
 	{
 		MGlobal::displayInfo("Kinect skeleton not found in scene. Creating new skeleton...");
 		skeleton.createSkeleton();
 	}
-	
-	return MS::kSuccess;
 }
+
+std::map<std::string, MObject>& KinectController::getSkeletonMap()
+{
+	return skeleton.getJointMap();
+}
+
 
 std::vector<JointData>& KinectController::getSkeleton()
 {

@@ -23,14 +23,17 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
 
         self.start_btn = QtWidgets.QPushButton("Start Stream")
         self.stop_btn = QtWidgets.QPushButton("Stop Stream")
+        self.import_btn = QtWidgets.QPushButton("Import Model")
         
         # Styling buttons for visibility
         self.start_btn.setMinimumHeight(40)
         self.stop_btn.setMinimumHeight(40)
+        self.import_btn.setMinimumHeight(40)
 
         self.control_layout.addWidget(QtWidgets.QLabel("<b>Kinect Controls</b>"))
         self.control_layout.addWidget(self.start_btn)
         self.control_layout.addWidget(self.stop_btn)
+        self.control_layout.addWidget(self.import_btn)
         
         # --- Right Side: Image Feed ---
         self.image_container = QtWidgets.QWidget()
@@ -60,6 +63,7 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         # Button Connections
         self.start_btn.clicked.connect(self.start_stream)
         self.stop_btn.clicked.connect(self.stop_stream)
+        self.import_btn.clicked.connect(self.import_model)
 
     def start_stream(self):
         if not self.timer.isActive():
@@ -100,6 +104,11 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
                     QtCore.Qt.SmoothTransformation
                 )
                 self.image_label.setPixmap(scaled_pixmap)
+
+    def import_model(self):
+        cmds.importCharacter(r"C:/Users/Geri/Documents/Projects/CG/MayaKinect/tpose.obj")
+        print("Import Character")
+
 
     def closeEvent(self, event):
         if hasattr(self, 'timer'):

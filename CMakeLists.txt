@@ -49,11 +49,12 @@ add_library(MayaKinect SHARED
     src/mayakinectcmd.cpp
     src/skeletonbuilder.h
     src/skeletonbuilder.cpp
+    src/importcharactercmd.h
     "src/kincetcontroller.h"
     "src/kincetcontroller.cpp"
     
     
- "src/kinectupdateskeletoncmd.h" "src/kinectupdateskeletoncmd.cpp" "src/closekinectcmd.h" "src/closekinectcmd.cpp")
+ "src/kinectupdateskeletoncmd.h" "src/kinectupdateskeletoncmd.cpp" "src/closekinectcmd.h" "src/closekinectcmd.cpp" "src/importcharactercmd.cpp")
 
 
 target_include_directories(MayaKinect PRIVATE

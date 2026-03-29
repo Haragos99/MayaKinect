@@ -23,10 +23,10 @@ public:
 	bool getImageBuffer(unsigned char* outbuffer);
 
 	void stop();
-
+	void createSkeleton();
 	void createDebugSpheres();
 	void updateDebugSpheres();
-
+	std::map<std::string, MObject>& getSkeletonMap();
 	void applyRotation(const MString& jointName, const MQuaternion& quat);
 	void applyRotation(const MString& jointName, const MMatrix& rotMatrix);
 
