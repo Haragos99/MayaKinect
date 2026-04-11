@@ -7,7 +7,7 @@ This project provides a **Maya C++ UI integrated with Python** for realtime moti
 
 ## Results
 ![kinect  example](resources/kinect.gif)
-![kinect  example2](resources/kinect2.gif)
+![kinect  example2](resources/kinect3.gif)
 
 ## Features
 - Realtime motion capture streaming from Kinect 360
