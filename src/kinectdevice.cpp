@@ -130,6 +130,7 @@ void KinectDevice::processSkeleton()
         {
             // We're tracking the skeleton, draw it
             creatSkeleton(skeletonFrame.SkeletonData[i]);
+			break; // Only process the first tracked skeleton
         }
 
     }
@@ -241,7 +242,6 @@ void KinectDevice::creatSkeleton(NUI_SKELETON_DATA& skel)
         jd.orientation = MQuaternion(q.x, q.y, -q.z, -q.w);
         jd.rotation = convertToMayaMatrix(matrix);
 		jd.positionKinect = skel.SkeletonPositions[i];
-
 
         joints.push_back(jd);
     }
@@ -409,6 +409,57 @@ MQuaternion KinectDevice::matToQuat(const MMatrix& m)
     return q;
 }
 
+// Build a rotation matrix from two axes: vx (primary) and vy (secondary)
+MMatrix KinectDevice::mat3FromAxis(const MVector& vx, const MVector& vy)
+{
+    MVector Y = vy.normal();
+    MVector Z = (vx.normal() ^ Y).normal();   // cross(normalize(vx), Y)
+    MVector X = (Y ^ Z).normal();             // cross(Y, Z) -> right-hand rebuild
+
+    double m[4][4] = {
+        { X.x, X.y, X.z, 0.0 },
+        { Y.x, Y.y, Y.z, 0.0 },
+        { Z.x, Z.y, Z.z, 0.0 },
+        { 0.0, 0.0, 0.0, 1.0 }
+    };
+
+    return MMatrix(m);
+}
+
+// Rotation matrix around X axis
+MMatrix KinectDevice::rotX(double rad)
+{
+    double c = std::cos(rad);
+    double s = std::sin(rad);
+
+    double m[4][4] = {
+        { 1,  0,  0,  0 },
+        { 0,  c,  s,  0 },
+        { 0, -s,  c,  0 },
+        { 0,  0,  0,  1 }
+    };
+
+    return MMatrix(m);
+}
+
+
+// Rotation matrix around Z axis
+MMatrix KinectDevice::rotZ(double rad)
+{
+    double c = std::cos(rad);
+    double s = std::sin(rad);
+
+    double m[4][4] = {
+        {  c,  s,  0,  0 },
+        { -s,  c,  0,  0 },
+        {  0,  0,  1,  0 },
+        {  0,  0,  0,  1 }
+    };
+
+    return MMatrix(m);
+}
+
+
 
 void KinectDevice::calculateQuaternion()
 {
@@ -434,51 +485,9 @@ void KinectDevice::calculateQuaternion()
     auto boneVec = [&](NUI_SKELETON_POSITION_INDEX from,
         NUI_SKELETON_POSITION_INDEX to) -> MVector
         {
-            const Vector4& p1 = joints[from].positionKinect;
-            const Vector4& p2 = joints[to].positionKinect;
+            const auto& p1 = joints[from].position;
+            const auto& p2 = joints[to].position;
             return MVector(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
-        };
-
-	// Build a rotation matrix from two axes: vx (primary) and vy (secondary)
-    auto mat3FromAxis = [&](const MVector& vx, const MVector& vy) -> MMatrix
-        {
-            MVector Y = vy.normal();
-            MVector Z = (vx.normal() ^ Y).normal();   // cross(normalize(vx), Y)
-            MVector X = (Y ^ Z).normal();              // cross(Y, Z)  ->  right-hand rebuild
-
-            double m[4][4] = {
-                { X.x, X.y, X.z, 0.0 },
-                { Y.x, Y.y, Y.z, 0.0 },
-                { Z.x, Z.y, Z.z, 0.0 },
-                { 0.0, 0.0, 0.0, 1.0 }
-            };
-            return MMatrix(m);
-        };
-
- 
-    // Rotation matrices around each axis
-    auto rotX = [](double rad) -> MMatrix
-        {
-            double c = std::cos(rad), s = std::sin(rad);
-            double m[4][4] = {
-                { 1,  0,  0,  0 },
-                { 0,  c,  s,  0 },
-                { 0, -s,  c,  0 },
-                { 0,  0,  0,  1 }
-            };
-            return MMatrix(m);
-        };
-
-    auto rotZ = [](double rad) -> MMatrix
-        {
-            double c = std::cos(rad), s = std::sin(rad);
-            double m[4][4] = {
-                {  c,  s,  0,  0 },
-                { -s,  c,  0,  0 },
-                {  0,  0,  1,  0 },
-                {  0,  0,  0,  1 }
-            };
-            return MMatrix(m);
         };
 
     auto storeQuat = [&](NUI_SKELETON_POSITION_INDEX joint, const MQuaternion& q)
@@ -497,7 +506,6 @@ void KinectDevice::calculateQuaternion()
             MMatrix finalMat = bindInverse * boneMat;   // row-major: bindInv first
             storeQuat(joint, matToQuat(finalMat));
         };
-
 
     const MMatrix inverseBindPoseNone = MMatrix::identity;
     const MMatrix inverseBindPoseArmL = rotZ(-PI / 2.0);   // inverse of rotZ(+π/2)
@@ -634,7 +642,6 @@ void KinectDevice::calculateQuaternion()
             joints[NUI_SKELETON_POSITION_ANKLE_RIGHT].quat;
     }
 }
-
 
 KinectDevice::~KinectDevice()
 {

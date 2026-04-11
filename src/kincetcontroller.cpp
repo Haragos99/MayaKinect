@@ -68,8 +68,6 @@ void KinectController::updateMayaSkeleton()
 	auto& jointMap = skeleton.getJointMap();
 	auto& offsets = kinect.getOffsets();
 	auto parentMap = kinect.parent_joint_map;
-	std::vector<MVector> globalPos(joints.size());
-	std::vector<MQuaternion> globalRot(joints.size());
 
 	for (int i = 0; i < joints.size(); ++i)
 	{
@@ -79,32 +77,68 @@ void KinectController::updateMayaSkeleton()
 		{
 			continue;
 		}
+		std::string& jointName = itName->second;
 
-		auto itMaya = jointMap.find(itName->second);
+		// Skip foot joints to prevent unnatural leg twisting
+		if (jointName == "AnkleRight" || jointName == "AnkleLeft")
+		{
+			continue;
+		}
+
+		auto itMaya = jointMap.find(jointName);
+
 		if (itMaya == jointMap.end()) 
 		{
 			continue;
 		}
-		MObject mayaJoint = itMaya->second;
+		MObject& mayaJoint = itMaya->second;
 		MFnIkJoint fnJoint(mayaJoint);
 		MFnTransform fnTrans(mayaJoint);
 
-		MQuaternion jointOrient;
-		fnJoint.getOrientation(jointOrient);
 
 		int parent = parentMap[i];
 
-		MEulerRotation localEuler = kinect.getEulers(i);
+		MEulerRotation localEuler = (kinect.getEulers(i));
 		MQuaternion localRot = localEuler.asQuaternion();
 
-		if (itName->second == "SpineBase")
-		{
-			MVector pos = joints[i].position * 100;
-			fnTrans.setTranslation(pos, MSpace::kTransform);
+		MQuaternion correction;
+		correction.setAxisAngle(MVector::yAxis, PI);
+		MQuaternion q_current;
+		if (jointName == "KneeRight" || jointName == "KneeLeft")
+		{ 
+			q_current = correction * localRot;
 		}
 		else
 		{
-			fnTrans.setRotation(localRot, MSpace::kTransform);
+			q_current = localRot;
+		}
+
+		// Convert radians to degrees
+		double xDeg = localEuler.x * (180.0 / PI);
+		double yDeg = localEuler.y * (180.0 / PI);
+		double zDeg = localEuler.z * (180.0 / PI);
+
+		// Print to Maya console
+		MString msg;
+		
+		MString formatStr = MString(jointName.c_str()) +
+			"(degrees): X = ^1s, Y = ^2s, Z = ^3s";
+
+		msg.format(formatStr,
+			std::to_string(xDeg).c_str(),
+			std::to_string(yDeg).c_str(),
+			std::to_string(zDeg).c_str());
+		MGlobal::displayInfo(msg);
+
+		if (jointName == "SpineBase")
+		{
+			MVector pos = joints[i].position * 100;
+			//fnTrans.setTranslation(pos, MSpace::kTransform);
+			fnTrans.setRotation(q_current, MSpace::kTransform);
+		}
+		else
+		{
+			fnTrans.setRotation(q_current, MSpace::kTransform);
 		}
 	}
 }

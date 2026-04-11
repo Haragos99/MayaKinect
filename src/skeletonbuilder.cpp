@@ -42,7 +42,7 @@ void SkeletonBuilder::createSkeleton()
     m_jointMap.clear();
 
     // Root
-    MObject spineBase = createJoint("SpineBase", MObject::kNullObj, MVector(0, 100, 0));
+    MObject spineBase = createJoint("SpineBase", MObject::kNullObj, MVector(0, 100, 0), 3.14159265358979323846);
     m_jointMap["SpineBase"] = spineBase;
 
     MObject spineMid = createJoint("SpineMid", spineBase, MVector(0, 20, 0));
@@ -96,7 +96,7 @@ void SkeletonBuilder::createSkeleton()
     MObject ankleL = createJoint("AnkleLeft", kneeL, MVector(0, -40, 0));
     m_jointMap["AnkleLeft"] = ankleL;
 
-    MObject footL = createJoint("FootLeft", ankleL, MVector(0, -10, 10));
+    MObject footL = createJoint("FootLeft", ankleL, MVector(0, -10, -10));
     m_jointMap["FootLeft"] = footL;
 
 
@@ -110,7 +110,7 @@ void SkeletonBuilder::createSkeleton()
     MObject ankleR = createJoint("AnkleRight", kneeR, MVector(0, -40, 0));
     m_jointMap["AnkleRight"] = ankleR;
 
-    MObject footR = createJoint("FootRight", ankleR, MVector(0, -10, 10));
+    MObject footR = createJoint("FootRight", ankleR, MVector(0, -10, -10));
     m_jointMap["FootRight"] = footR;
     MGlobal::displayInfo("Kinect skeleton created successfully.");
 }
@@ -119,7 +119,8 @@ void SkeletonBuilder::createSkeleton()
 
 MObject SkeletonBuilder::createJoint(const MString& name,
     const MObject& parent,
-    const MVector& position)
+    const MVector& position,
+    const double oriatinAngel)
 {
     MStatus status;
 
@@ -133,6 +134,7 @@ MObject SkeletonBuilder::createJoint(const MString& name,
     }
 
     jointFn.setName(name);
+	jointFn.setOrientation(MEulerRotation(0, oriatinAngel, 0));
     jointFn.setTranslation(position, MSpace::kTransform);
 
     return joint;

@@ -57,6 +57,9 @@ private:
     HWND  m_hWnd;
     std::vector<JointData> joints;
     void drawLine(unsigned char* buffer, int x1, int y1, int x2, int y2, int thickness);
+    MMatrix mat3FromAxis(const MVector& vx, const MVector& vy);
+    MMatrix rotX(double rad);
+    MMatrix rotZ(double rad);
     void drawPixel(unsigned char* buffer, int x, int y, unsigned char r, unsigned char g, unsigned char b, int radius);
     MMatrix convertToMayaMatrix(const Matrix4& kMat);
     std::vector<MVector> offsets;

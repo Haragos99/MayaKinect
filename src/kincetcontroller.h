@@ -3,7 +3,7 @@
 #include "kinectdevice.h"
 #include <maya/MString.h>
 #include <maya/MObjectArray.h>
-
+#include <maya/MGlobal.h>
 class KinectController
 {
 public:

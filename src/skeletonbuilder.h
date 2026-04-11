@@ -15,6 +15,6 @@ public:
     std::map<std::string, MObject>& getJointMap() { return m_jointMap; }
 
 private:
-    MObject createJoint(const MString& name, const MObject& parent, const MVector& position);
+    MObject createJoint(const MString& name, const MObject& parent, const MVector& position, const double oriatinAngel = 0);
     std::map<std::string, MObject> m_jointMap;
 };
