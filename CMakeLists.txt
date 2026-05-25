@@ -43,18 +43,18 @@ link_directories("C:/Program Files/Autodesk/Maya2026/lib")
 
 add_library(MayaKinect SHARED
     src/main.cpp
-    src/kinectdevice.h
-    src/kinectdevice.cpp
-    src/mayakinectcmd.h
-    src/mayakinectcmd.cpp
-    src/skeletonbuilder.h
-    src/skeletonbuilder.cpp
-    src/importcharactercmd.h
-    "src/kincetcontroller.h"
-    "src/kincetcontroller.cpp"
+    "src/kinect/kinectdevice.h"
+    "src/kinect/kinectdevice.cpp"
+    "src/cmds/mayakinectcmd.h"
+    "src/cmds/mayakinectcmd.cpp"
+    "src/skeleton/skeletonbuilder.h"
+    "src/skeleton/skeletonbuilder.cpp"
+    "src/cmds/importcharactercmd.h"
+    "src/kinect/kincetcontroller.h"
+    "src/kinect/kincetcontroller.cpp"
     
     
- "src/kinectupdateskeletoncmd.h" "src/kinectupdateskeletoncmd.cpp" "src/closekinectcmd.h" "src/closekinectcmd.cpp" "src/importcharactercmd.cpp")
+ "src/cmds/kinectupdateskeletoncmd.h" "src/cmds/kinectupdateskeletoncmd.cpp" "src/cmds/closekinectcmd.h" "src/cmds/closekinectcmd.cpp" "src/cmds/importcharactercmd.cpp")
 
 
 target_include_directories(MayaKinect PRIVATE

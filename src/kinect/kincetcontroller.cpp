@@ -27,7 +27,6 @@ MStatus KinectController::initKinect()
 }
 
 
-
 void KinectController::createSkeleton()
 {
 	if (!skeleton.skeletonExists())
@@ -95,7 +94,6 @@ void KinectController::updateMayaSkeleton()
 		MFnIkJoint fnJoint(mayaJoint);
 		MFnTransform fnTrans(mayaJoint);
 
-
 		int parent = parentMap[i];
 
 		MEulerRotation localEuler = (kinect.getEulers(i));
@@ -133,7 +131,7 @@ void KinectController::updateMayaSkeleton()
 		if (jointName == "SpineBase")
 		{
 			MVector pos = joints[i].position * 100;
-			//fnTrans.setTranslation(pos, MSpace::kTransform);
+			fnTrans.setTranslation(pos, MSpace::kTransform);
 			fnTrans.setRotation(q_current, MSpace::kTransform);
 		}
 		else

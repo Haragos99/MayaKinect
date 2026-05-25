@@ -2,7 +2,7 @@
 #pragma once
 #include <maya/MGlobal.h>
 #include <maya/MPxCommand.h>
-#include "kincetcontroller.h"
+#include "../kinect/kincetcontroller.h"
 #include <maya/MArgList.h>
 
 

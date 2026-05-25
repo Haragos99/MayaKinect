@@ -1,9 +1,10 @@
 #pragma once
-#include "skeletonbuilder.h"
 #include "kinectdevice.h"
 #include <maya/MString.h>
 #include <maya/MObjectArray.h>
 #include <maya/MGlobal.h>
+#include "../skeleton/skeletonbuilder.h"
+
 class KinectController
 {
 public:

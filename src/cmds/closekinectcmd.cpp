@@ -1,6 +1,7 @@
 #include "closekinectcmd.h"
 
 
+
 MStatus CloseKinectCmd::doIt(const MArgList& args)
 {
     auto& controller = KinectController::instance();

@@ -1,9 +1,9 @@
 #include <maya/MFnPlugin.h>
-#include "mayakinectcmd.h"
 #include <maya/MTimerMessage.h>
-#include "kinectupdateskeletoncmd.h"
-#include "closekinectcmd.h"
-#include "importcharactercmd.h"
+#include "cmds/importcharactercmd.h"
+#include "cmds/closekinectcmd.h"
+#include "cmds/kinectupdateskeletoncmd.h"
+#include "cmds/mayakinectcmd.h"
 
 
 
@@ -16,7 +16,6 @@ MStatus initializePlugin(MObject obj)
     plugin.registerCommand("importCharacter", ImportCharacterCmd::creator);
     return MS::kSuccess;
 }
-
 
 MStatus uninitializePlugin(MObject obj)
 {

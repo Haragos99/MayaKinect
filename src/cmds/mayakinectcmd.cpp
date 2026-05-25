@@ -1,8 +1,5 @@
 #include "mayakinectcmd.h"
-#include "kincetcontroller.h"
 #include <maya/MGlobal.h>
-
-
 
 
 
