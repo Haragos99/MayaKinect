@@ -18,20 +18,28 @@ MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt, const
         return prev;
     }
 
-    MQuaternion a = prev;
-    MQuaternion b = raw;
+    MQuaternion previusRotaion = prev;
+    MQuaternion rawRotaion = raw;
 
     // shortest-arc: if dot<0, invert b
-    double d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-    if (d < 0.0)
+    double dot = previusRotaion.x * rawRotaion.x + 
+                 previusRotaion.y * rawRotaion.y + 
+                 previusRotaion.z * rawRotaion.z +
+                 previusRotaion.w * rawRotaion.w;
+
+    if (dot < 0.0)
     {
-        b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
-        d = -d;
+        rawRotaion.x = -rawRotaion.x; 
+        rawRotaion.y = -rawRotaion.y;
+        rawRotaion.z = -rawRotaion.z;
+        rawRotaion.w = -rawRotaion.w;
+
+        dot = -dot;
     }
-    d = std::clamp(d, -1.0, 1.0);
+    dot = std::clamp(dot, -1.0, 1.0);
 
     // deegre 
-    double angleDeg = 2.0 * std::acos(std::abs(d)) * 180.0 / 3.14159265358979323846;
+    double angleDeg = 2.0 * std::acos(std::abs(dot)) * 180.0 / 3.14159265358979323846;
 
     // deadzone
     if (angleDeg < cfg.deadzoneDeg)
@@ -43,11 +51,11 @@ MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt, const
     double tClamp = (angleDeg > maxStep) ? (maxStep / angleDeg) : 1.0;
     tClamp = std::clamp(tClamp, 0.0, 1.0);
 
-    MQuaternion limited = slerp(a, b, tClamp);
+    MQuaternion limited = slerp(previusRotaion, rawRotaion, tClamp);
 
     // low-pass
     double alpha = std::clamp(cfg.alpha, 0.0, 1.0);
-    MQuaternion out = slerp(a, limited, alpha);
+    MQuaternion out = slerp(previusRotaion, limited, alpha);
     out.normalizeIt();
 
     prev = out;
@@ -56,33 +64,38 @@ MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt, const
 
 MQuaternion JointRotFilter::slerp(const MQuaternion& q1, const MQuaternion& q2, double t)
 {
-    t = std::clamp(t, 0.0, 1.0);
+    MQuaternion prev = q1; 
+    prev.normalizeIt();
 
-    MQuaternion a = q1; 
-    a.normalizeIt();
+    MQuaternion limited = q2; 
+    limited.normalizeIt();
 
-    MQuaternion b = q2; 
-    b.normalizeIt();
-
-    double dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    double dot = prev.x * limited.x + 
+                 prev.y * limited.y +
+                 prev.z * limited.z + 
+                 prev.w * limited.w;
 
     if (dot < 0.0)
     {
-        b.x = -b.x; b.y = -b.y; b.z = -b.z; b.w = -b.w;
+        limited.x = -limited.x;
+        limited.y = -limited.y;
+        limited.z = -limited.z;
+        limited.w = -limited.w;
+
         dot = -dot;
     }
 
     const double DOT_THRESHOLD = 0.9995;
     if (dot > DOT_THRESHOLD)
     {
-        MQuaternion r(
-            a.x + t * (b.x - a.x),
-            a.y + t * (b.y - a.y),
-            a.z + t * (b.z - a.z),
-            a.w + t * (b.w - a.w)
+        MQuaternion rotaion(
+            prev.x + t * (limited.x - prev.x),
+            prev.y + t * (limited.y - prev.y),
+            prev.z + t * (limited.z - prev.z),
+            prev.w + t * (limited.w - prev.w)
         );
-        r.normalizeIt();
-        return r;
+        rotaion.normalizeIt();
+        return rotaion;
     }
 
     dot = std::clamp(dot, -1.0, 1.0);
@@ -94,12 +107,12 @@ MQuaternion JointRotFilter::slerp(const MQuaternion& q1, const MQuaternion& q2, 
     double s0 = std::cos(theta) - dot * sinTheta / sinTheta0;
     double s1 = sinTheta / sinTheta0;
 
-    MQuaternion r(
-        s0 * a.x + s1 * b.x,
-        s0 * a.y + s1 * b.y,
-        s0 * a.z + s1 * b.z,
-        s0 * a.w + s1 * b.w
+    MQuaternion rotaion(
+        s0 * prev.x + s1 * limited.x,
+        s0 * prev.y + s1 * limited.y,
+        s0 * prev.z + s1 * limited.z,
+        s0 * prev.w + s1 * limited.w
     );
-    r.normalizeIt();
-    return r;
+    rotaion.normalizeIt();
+    return rotaion;
 }
