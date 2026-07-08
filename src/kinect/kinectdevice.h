@@ -25,6 +25,7 @@ struct JointData
     MAngle eulerY;
     MAngle eulerZ;
     Vector4 quat;
+    NUI_SKELETON_POSITION_TRACKING_STATE trackingState;
 };
 
 const double PI = 3.14159265358979323846;

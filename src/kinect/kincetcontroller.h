@@ -4,6 +4,8 @@
 #include <maya/MObjectArray.h>
 #include <maya/MGlobal.h>
 #include "../skeleton/skeletonbuilder.h"
+#include "../utilty/rotationfilter.h"
+#include <chrono>
 
 class KinectController
 {
@@ -35,5 +37,14 @@ private:
 	SkeletonBuilder skeleton; // responsable for the maya skeleton
 	KinectDevice kinect; // responble the kinnect
 	MObjectArray debugSpheres;
+
+	std::array<JointRotFilter, NUI_SKELETON_POSITION_COUNT> rotFilters{};
+	std::chrono::steady_clock::time_point lastUpdateTs{};
+	bool hasLastUpdateTs = false;
+
+	RotFilterConfig torsoCfg{ 0.6, 300.0, 0.20 };
+	RotFilterConfig armCfg{ 0.8, 360.0, 0.14 };
+	RotFilterConfig legCfg{ 0.8, 300.0, 0.16 };
+
 
 };

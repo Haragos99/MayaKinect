@@ -104,35 +104,28 @@ void KinectDevice::processSkeleton()
 {
     NUI_SKELETON_FRAME skeletonFrame = { 0 };
     joints.clear();
+
     HRESULT hr = NuiSensor->NuiSkeletonGetNextFrame(0, &skeletonFrame);
     if (FAILED(hr))
-    {
         return;
-    }
-    const NUI_TRANSFORM_SMOOTH_PARAMETERS defaultParams = { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
 
-    NuiSensor->NuiTransformSmooth(&skeletonFrame, &defaultParams);
-
-    // smooth out the skeleton data
-    NuiSensor->NuiTransformSmooth(&skeletonFrame, NULL);
-
-    RECT rct;
-    GetClientRect(GetDlgItem(m_hWnd, IDC_VIDEOVIEW), &rct);
-    int width = rct.right;
-    int height = rct.bottom;
-
+    // EGYETLEN smoothing hívás (dupla helyett)
+    const NUI_TRANSFORM_SMOOTH_PARAMETERS smoothParams = {
+        0.60f, // smoothing
+        0.25f, // correction
+        0.25f, // prediction
+        0.04f, // jitter radius
+        0.03f  // max deviation radius
+    };
+    NuiSensor->NuiTransformSmooth(&skeletonFrame, &smoothParams);
 
     for (int i = 0; i < NUI_SKELETON_COUNT; ++i)
     {
-        auto trackingState = skeletonFrame.SkeletonData[i].eTrackingState;
-
-        if (NUI_SKELETON_TRACKED == trackingState)
+        if (skeletonFrame.SkeletonData[i].eTrackingState == NUI_SKELETON_TRACKED)
         {
-            // We're tracking the skeleton, draw it
             creatSkeleton(skeletonFrame.SkeletonData[i]);
-			break; // Only process the first tracked skeleton
+            break;
         }
-
     }
 }
 
@@ -242,7 +235,7 @@ void KinectDevice::creatSkeleton(NUI_SKELETON_DATA& skel)
         jd.orientation = MQuaternion(q.x, q.y, -q.z, -q.w);
         jd.rotation = convertToMayaMatrix(matrix);
 		jd.positionKinect = skel.SkeletonPositions[i];
-
+        jd.trackingState = skel.eSkeletonPositionTrackingState[i];
         joints.push_back(jd);
     }
     calculateQuaternion();
