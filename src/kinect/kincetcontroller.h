@@ -42,9 +42,7 @@ private:
 	std::chrono::steady_clock::time_point lastUpdateTs{};
 	bool hasLastUpdateTs = false;
 
-	RotFilterConfig torsoCfg{ 0.6, 300.0, 0.20 };
-	RotFilterConfig armCfg{ 0.8, 360.0, 0.14 };
-	RotFilterConfig legCfg{ 0.8, 300.0, 0.16 };
-
-
+	RotFilterConfig torsoCfg{ 0.4, 300.0, 0.50 };    // Reduced from 0.6
+	RotFilterConfig armCfg{ 0.5, 360.0, 0.40 };      // Reduced from 0.8
+	RotFilterConfig legCfg{ 0.5, 300.0, 0.45 };      // Reduced from 0.8
 };
