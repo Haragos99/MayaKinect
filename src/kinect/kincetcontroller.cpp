@@ -64,24 +64,21 @@ void KinectController::updateMayaSkeleton()
 	kinect.processSkeleton();
 
 	auto& joints = kinect.getLatestJoints();
-	if (joints.empty())
+	if (joints.size() != NUI_SKELETON_POSITION_COUNT)
 	{
 		if (++lostFrames == 15)
-		{
-			for (auto& filter : rotFilters) 
-			{ 
-				filter.reset(); 
-			}
-		}
+			for (auto& filter : rotFilters) filter.reset();
 		return;
 	}
 	lostFrames = 0;
 
+	// turn on only after the unfiltered pose matches the green skeleton
+	constexpr bool useRotationFilter = false;
 	const double dt = std::clamp(kinect.getFrameDt(), 1.0 / 120.0, 0.1);
 	auto& kinectToMayaMap = kinect.getKinectToMayaMap();
 	auto& jointMap = skeleton.getJointMap();
 
-	for (int i = 0; i < static_cast<int>(joints.size()); ++i)
+	for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i)
 	{
 		auto nameIt = kinectToMayaMap.find(i);
 		if (nameIt == kinectToMayaMap.end())
@@ -90,6 +87,13 @@ void KinectController::updateMayaSkeleton()
 		}
 		const std::string& jointName = nameIt->second;
 
+
+		// Skip foot joints to prevent unnatural leg twisting
+		if (jointName == "AnkleRight" || jointName == "AnkleLeft")
+		{
+			continue;
+		}
+
 		auto mayaIt = jointMap.find(jointName);
 		if (mayaIt == jointMap.end())
 		{
@@ -97,28 +101,34 @@ void KinectController::updateMayaSkeleton()
 		}
 		MFnTransform transform(mayaIt->second);
 
-		RotFilterConfig config = torsoCfg;
-		if (jointName.find("Shoulder") != std::string::npos ||
-			jointName.find("Elbow") != std::string::npos ||
-			jointName.find("Wrist") != std::string::npos ||
-			jointName.find("Hand") != std::string::npos)
+		MQuaternion q = kinect.getLocalQuat(i);
+		q.normalizeIt();
+
+		if (useRotationFilter)
 		{
-			config = armCfg;
-		}
-		else if (jointName.find("Hip") != std::string::npos ||
-			jointName.find("Knee") != std::string::npos ||
-			jointName.find("Ankle") != std::string::npos ||
-			jointName.find("Foot") != std::string::npos)
-		{
-			config = legCfg;
-		}
-		if (joints[i].trackingState != NUI_SKELETON_POSITION_TRACKED)
-		{
-			config.minCutoffHz *= 0.5;
+			RotFilterConfig config = torsoCfg;
+			if (jointName.find("Shoulder") != std::string::npos ||
+				jointName.find("Elbow") != std::string::npos ||
+				jointName.find("Wrist") != std::string::npos ||
+				jointName.find("Hand") != std::string::npos)
+			{
+				config = armCfg;
+			}
+			else if (jointName.find("Hip") != std::string::npos ||
+				jointName.find("Knee") != std::string::npos ||
+				jointName.find("Ankle") != std::string::npos ||
+				jointName.find("Foot") != std::string::npos)
+			{
+				config = legCfg;
+			}
+			if (joints[i].trackingState != NUI_SKELETON_POSITION_TRACKED)
+			{
+				config.minCutoffHz *= 0.5;
+			}
+
+			q = rotFilters[i].update(q, dt, config);
 		}
 
-		MQuaternion q = rotFilters[i].update(kinect.getLocalQuat(i), dt, config);
-		q = kinect.getLocalQuat(i);
 		if (i == NUI_SKELETON_POSITION_HIP_CENTER)
 		{
 			transform.setTranslation(joints[i].position * 100.0, MSpace::kTransform);
@@ -126,6 +136,7 @@ void KinectController::updateMayaSkeleton()
 		transform.setRotation(q, MSpace::kTransform);
 	}
 }
+
 
 void KinectController::createDebugSpheres()
 {

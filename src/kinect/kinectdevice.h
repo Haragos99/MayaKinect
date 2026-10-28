@@ -71,7 +71,7 @@ private:
 
     MVector lastArmVx[2] = { MVector(0, 1, 0), MVector(0, -1, 0) };
     MVector lastLegVx[2] = { MVector(-1, 0, 0), MVector(-1, 0, 0) };
-
+    std::array<MQuaternion, NUI_SKELETON_POSITION_COUNT> lastWorldQuats;
     // Map Kinect v1 Indices to your Maya joint names
     std::map<int, std::string> kinectToMayaMap = {
         { NUI_SKELETON_POSITION_HIP_CENTER,      "SpineBase" },
