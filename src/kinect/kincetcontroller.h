@@ -37,12 +37,12 @@ private:
 	SkeletonBuilder skeleton; // responsable for the maya skeleton
 	KinectDevice kinect; // responble the kinnect
 	MObjectArray debugSpheres;
-
+	int lostFrames;
 	std::array<JointRotFilter, NUI_SKELETON_POSITION_COUNT> rotFilters{};
 	std::chrono::steady_clock::time_point lastUpdateTs{};
 	bool hasLastUpdateTs = false;
 
-	RotFilterConfig torsoCfg{ 0.4, 300.0, 0.50 };    // Reduced from 0.6
-	RotFilterConfig armCfg{ 0.5, 360.0, 0.40 };      // Reduced from 0.8
-	RotFilterConfig legCfg{ 0.5, 300.0, 0.45 };      // Reduced from 0.8
+	RotFilterConfig torsoCfg{ 0.8, 0.3, 1.0 };
+	RotFilterConfig armCfg{ 1.2, 0.6, 1.0 };
+	RotFilterConfig legCfg{ 1.0, 0.5, 1.0 };
 };

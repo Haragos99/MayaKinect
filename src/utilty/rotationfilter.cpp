@@ -1,16 +1,16 @@
 #include "rotationfilter.h" 
 
-void JointRotFilter::reset()
+double JointRotFilter::alpha(double cutoffHz, double dt)
 {
-    initialized = false;
-    prev = MQuaternion::identity;
+    const double tau = 1.0 / (2.0 * 3.14159265358979323846 * cutoffHz);
+    return 1.0 / (1.0 + tau / dt);
 }
 
-MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt, const RotFilterConfig& cfg)
+MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt,
+    const RotFilterConfig& cfg)
 {
     MQuaternion raw = rawInput;
     raw.normalizeIt();
-
     if (!initialized)
     {
         prev = raw;
@@ -18,62 +18,29 @@ MQuaternion JointRotFilter::update(const MQuaternion& rawInput, double dt, const
         return prev;
     }
 
-    MQuaternion previusRotaion = prev;
-    MQuaternion rawRotaion = raw;
+    dt = (std::max)(dt, 1e-3);
+    double dot = std::abs(prev.x * raw.x + prev.y * raw.y +
+        prev.z * raw.z + prev.w * raw.w);
+    double angle = 2.0 * std::acos((std::min)(dot, 1.0));
 
-    // shortest-arc: if dot<0, invert b
-    double dot = previusRotaion.x * rawRotaion.x + 
-                 previusRotaion.y * rawRotaion.y + 
-                 previusRotaion.z * rawRotaion.z +
-                 previusRotaion.w * rawRotaion.w;
-
-    if (dot < 0.0)
-    {
-        rawRotaion.x = -rawRotaion.x; 
-        rawRotaion.y = -rawRotaion.y;
-        rawRotaion.z = -rawRotaion.z;
-        rawRotaion.w = -rawRotaion.w;
-
-        dot = -dot;
-    }
-    dot = std::clamp(dot, -1.0, 1.0);
-
-    // deegre 
-    double angleDeg = 2.0 * std::acos(std::abs(dot)) * 180.0 / 3.14159265358979323846;
-
-    // deadzone
-    if (angleDeg < cfg.deadzoneDeg)
-        return prev;
-
-    // rate limit
-    double safeDt = std::max(dt, 1e-4);
-    double maxStep = cfg.maxDegPerSec * safeDt;
-    double tClamp = (angleDeg > maxStep) ? (maxStep / angleDeg) : 1.0;
-    tClamp = std::clamp(tClamp, 0.0, 1.0);
-
-    MQuaternion limited = slerp(previusRotaion, rawRotaion, tClamp);
-
-    // low-pass
-    double alpha = std::clamp(cfg.alpha, 0.0, 1.0);
-    MQuaternion out = slerp(previusRotaion, limited, alpha);
-    out.normalizeIt();
-
-    prev = out;
+    speed += alpha(cfg.dCutoffHz, dt) * (angle / dt - speed);
+    const double cutoff = cfg.minCutoffHz + cfg.beta * speed;
+    prev = slerp(prev, raw, alpha(cutoff, dt));
     return prev;
 }
 
 MQuaternion JointRotFilter::slerp(const MQuaternion& q1, const MQuaternion& q2, double t)
 {
-    MQuaternion prev = q1; 
+    MQuaternion prev = q1;
     prev.normalizeIt();
 
-    MQuaternion limited = q2; 
+    MQuaternion limited = q2;
     limited.normalizeIt();
 
-    double dot = prev.x * limited.x + 
-                 prev.y * limited.y +
-                 prev.z * limited.z + 
-                 prev.w * limited.w;
+    double dot = prev.x * limited.x +
+        prev.y * limited.y +
+        prev.z * limited.z +
+        prev.w * limited.w;
 
     if (dot < 0.0)
     {
