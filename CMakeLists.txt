@@ -5,7 +5,7 @@ project(MayaKinect)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Maya is built with /MD — never use /MT or /MDd against it
+# Maya is built with /MD â€” never use /MT or /MDd against it
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "" FORCE)
 
 
@@ -36,10 +36,8 @@ set(KINECT_SDK         "C:/Program Files/Microsoft SDKs/Kinect/v1.8")
 set(KINECT_INCLUDE_DIR "${KINECT_SDK}/inc")
 set(KINECT_LIB_DIR     "${KINECT_SDK}/lib/amd64")
 
-include_directories("C:/Program Files/Autodesk/Maya2026/include")
-link_directories("C:/Program Files/Autodesk/Maya2026/lib")
-
-
+include_directories("${MAYA_SDK_ROOT}/include")
+link_directories("${MAYA_SDK_ROOT}/lib")
 
 add_library(MayaKinect SHARED
     src/main.cpp
@@ -52,10 +50,14 @@ add_library(MayaKinect SHARED
     "src/cmds/importcharactercmd.h"
     "src/kinect/kincetcontroller.h"
     "src/kinect/kincetcontroller.cpp"
-    
-    
- "src/cmds/kinectupdateskeletoncmd.h" "src/cmds/kinectupdateskeletoncmd.cpp" "src/cmds/closekinectcmd.h" "src/cmds/closekinectcmd.cpp" "src/cmds/importcharactercmd.cpp" "src/utilty/rotationfilter.h" "src/utilty/rotationfilter.cpp")
-
+    "src/cmds/kinectupdateskeletoncmd.h"
+    "src/cmds/kinectupdateskeletoncmd.cpp"
+    "src/cmds/closekinectcmd.h" 
+    "src/cmds/closekinectcmd.cpp" 
+    "src/cmds/importcharactercmd.cpp"
+    "src/utilty/rotationfilter.h" 
+    "src/utilty/rotationfilter.cpp"
+)
 
 target_include_directories(MayaKinect PRIVATE
     ${MAYA_INCLUDE_DIR}
@@ -82,7 +84,6 @@ target_link_libraries(MayaKinect PRIVATE
     opengl32.lib
 )
 
-
 if(MSVC)
     target_link_options(MayaKinect PRIVATE
         /export:initializePlugin
@@ -94,7 +95,6 @@ set_target_properties(MayaKinect PROPERTIES
     PREFIX ""
     SUFFIX ".mll"
 )
-
 
 add_custom_command(TARGET MayaKinect POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E echo "Built: $<TARGET_FILE:MayaKinect>"
