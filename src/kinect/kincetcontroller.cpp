@@ -59,24 +59,34 @@ void KinectController::stop()
 	kinect.shutdownKinect();
 }
 
-
 void KinectController::updateMayaSkeleton()
 {
-	auto& joints = getSkeleton();
+	kinect.processSkeleton();
+
+	auto& joints = kinect.getLatestJoints();
+	if (joints.size() != NUI_SKELETON_POSITION_COUNT)
+	{
+		if (++lostFrames == 15)
+			for (auto& filter : rotFilters) filter.reset();
+		return;
+	}
+	lostFrames = 0;
+
+	// turn on only after the unfiltered pose matches the green skeleton
+	constexpr bool useRotationFilter = false;
+	const double dt = std::clamp(kinect.getFrameDt(), 1.0 / 120.0, 0.1);
 	auto& kinectToMayaMap = kinect.getKinectToMayaMap();
 	auto& jointMap = skeleton.getJointMap();
-	auto& offsets = kinect.getOffsets();
-	auto parentMap = kinect.parent_joint_map;
 
-	for (int i = 0; i < joints.size(); ++i)
+	for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i)
 	{
-		// Find the name for this Kinect index
-		auto itName = kinectToMayaMap.find(i);
-		if (itName == kinectToMayaMap.end())
+		auto nameIt = kinectToMayaMap.find(i);
+		if (nameIt == kinectToMayaMap.end())
 		{
 			continue;
 		}
-		std::string& jointName = itName->second;
+		const std::string& jointName = nameIt->second;
+
 
 		// Skip foot joints to prevent unnatural leg twisting
 		if (jointName == "AnkleRight" || jointName == "AnkleLeft")
@@ -84,62 +94,49 @@ void KinectController::updateMayaSkeleton()
 			continue;
 		}
 
-		auto itMaya = jointMap.find(jointName);
-
-		if (itMaya == jointMap.end()) 
+		auto mayaIt = jointMap.find(jointName);
+		if (mayaIt == jointMap.end())
 		{
 			continue;
 		}
-		MObject& mayaJoint = itMaya->second;
-		MFnIkJoint fnJoint(mayaJoint);
-		MFnTransform fnTrans(mayaJoint);
+		MFnTransform transform(mayaIt->second);
 
-		int parent = parentMap[i];
+		MQuaternion q = kinect.getLocalQuat(i);
+		q.normalizeIt();
 
-		MEulerRotation localEuler = (kinect.getEulers(i));
-		MQuaternion localRot = localEuler.asQuaternion();
-
-		MQuaternion correction;
-		correction.setAxisAngle(MVector::yAxis, PI);
-		MQuaternion q_current;
-		if (jointName == "KneeRight" || jointName == "KneeLeft")
-		{ 
-			q_current = correction * localRot;
-		}
-		else
+		if (useRotationFilter)
 		{
-			q_current = localRot;
+			RotFilterConfig config = torsoCfg;
+			if (jointName.find("Shoulder") != std::string::npos ||
+				jointName.find("Elbow") != std::string::npos ||
+				jointName.find("Wrist") != std::string::npos ||
+				jointName.find("Hand") != std::string::npos)
+			{
+				config = armCfg;
+			}
+			else if (jointName.find("Hip") != std::string::npos ||
+				jointName.find("Knee") != std::string::npos ||
+				jointName.find("Ankle") != std::string::npos ||
+				jointName.find("Foot") != std::string::npos)
+			{
+				config = legCfg;
+			}
+			if (joints[i].trackingState != NUI_SKELETON_POSITION_TRACKED)
+			{
+				config.minCutoffHz *= 0.5;
+			}
+
+			q = rotFilters[i].update(q, dt, config);
 		}
 
-		// Convert radians to degrees
-		double xDeg = localEuler.x * (180.0 / PI);
-		double yDeg = localEuler.y * (180.0 / PI);
-		double zDeg = localEuler.z * (180.0 / PI);
-
-		// Print to Maya console
-		MString msg;
-		
-		MString formatStr = MString(jointName.c_str()) +
-			"(degrees): X = ^1s, Y = ^2s, Z = ^3s";
-
-		msg.format(formatStr,
-			std::to_string(xDeg).c_str(),
-			std::to_string(yDeg).c_str(),
-			std::to_string(zDeg).c_str());
-		MGlobal::displayInfo(msg);
-
-		if (jointName == "SpineBase")
+		if (i == NUI_SKELETON_POSITION_HIP_CENTER)
 		{
-			MVector pos = joints[i].position * 100;
-			fnTrans.setTranslation(pos, MSpace::kTransform);
-			fnTrans.setRotation(q_current, MSpace::kTransform);
+			transform.setTranslation(joints[i].position * 100.0, MSpace::kTransform);
 		}
-		else
-		{
-			fnTrans.setRotation(q_current, MSpace::kTransform);
-		}
+		transform.setRotation(q, MSpace::kTransform);
 	}
 }
+
 
 void KinectController::createDebugSpheres()
 {

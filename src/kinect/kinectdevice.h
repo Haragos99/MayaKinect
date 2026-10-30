@@ -25,6 +25,7 @@ struct JointData
     MAngle eulerY;
     MAngle eulerZ;
     Vector4 quat;
+    NUI_SKELETON_POSITION_TRACKING_STATE trackingState;
 };
 
 const double PI = 3.14159265358979323846;
@@ -43,6 +44,8 @@ public:
     MEulerRotation getEulers(int idx);
     void calculateQuaternion();
     void initoffsets();
+    double getFrameDt() const { return frameDt; }
+    MQuaternion getLocalQuat(int idx) const;
     static const int parent_joint_map[NUI_SKELETON_POSITION_COUNT];
     std::vector<MVector>& getOffsets() { return offsets; }
     ~KinectDevice();
@@ -64,6 +67,11 @@ private:
     MMatrix convertToMayaMatrix(const Matrix4& kMat);
     std::vector<MVector> offsets;
     MQuaternion matToQuat(const MMatrix& m);
+    double frameDt = 1.0 / 30.0;
+
+    MVector lastArmVx[2] = { MVector(0, 1, 0), MVector(0, -1, 0) };
+    MVector lastLegVx[2] = { MVector(-1, 0, 0), MVector(-1, 0, 0) };
+    std::array<MQuaternion, NUI_SKELETON_POSITION_COUNT> lastWorldQuats;
     // Map Kinect v1 Indices to your Maya joint names
     std::map<int, std::string> kinectToMayaMap = {
         { NUI_SKELETON_POSITION_HIP_CENTER,      "SpineBase" },

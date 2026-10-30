@@ -1,5 +1,34 @@
 ﻿#include "kinectdevice.h"
 
+namespace
+{
+    double clampd(double value, double low, double high)
+    {
+        return value < low ? low : (value > high ? high : value);
+    }
+
+    double smoothstep(double edge0, double edge1, double value)
+    {
+        double t = clampd((value - edge0) / (edge1 - edge0), 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    }
+
+    double signedAngle(const MVector& a, const MVector& b, const MVector& axis)
+    {
+        return std::atan2((a ^ b) * axis, a * b);
+    }
+
+    MVector rotateAround(const MVector& value, const MVector& axis, double angle)
+    {
+        return value.rotateBy(MQuaternion(angle, axis));
+    }
+
+    MVector orthoTo(const MVector& value, const MVector& unitNormal)
+    {
+        return value - unitNormal * (value * unitNormal);
+    }
+}
+
 
 // Static parent hierarchy — mirrors Kinect's skeleton tree
 const int KinectDevice::parent_joint_map[NUI_SKELETON_POSITION_COUNT] =
@@ -104,35 +133,30 @@ void KinectDevice::processSkeleton()
 {
     NUI_SKELETON_FRAME skeletonFrame = { 0 };
     joints.clear();
+
     HRESULT hr = NuiSensor->NuiSkeletonGetNextFrame(0, &skeletonFrame);
     if (FAILED(hr))
     {
         return;
     }
-    const NUI_TRANSFORM_SMOOTH_PARAMETERS defaultParams = { 0.5f, 0.5f, 0.5f, 0.05f, 0.04f };
 
-    NuiSensor->NuiTransformSmooth(&skeletonFrame, &defaultParams);
-
-    // smooth out the skeleton data
-    NuiSensor->NuiTransformSmooth(&skeletonFrame, NULL);
-
-    RECT rct;
-    GetClientRect(GetDlgItem(m_hWnd, IDC_VIDEOVIEW), &rct);
-    int width = rct.right;
-    int height = rct.bottom;
-
+    // EGYETLEN smoothing hívás (dupla helyett)
+    const NUI_TRANSFORM_SMOOTH_PARAMETERS smoothParams = {
+        0.60f, // smoothing
+        0.25f, // correction
+        0.25f, // prediction
+        0.04f, // jitter radius
+        0.03f  // max deviation radius
+    };
+    NuiSensor->NuiTransformSmooth(&skeletonFrame, &smoothParams);
 
     for (int i = 0; i < NUI_SKELETON_COUNT; ++i)
     {
-        auto trackingState = skeletonFrame.SkeletonData[i].eTrackingState;
-
-        if (NUI_SKELETON_TRACKED == trackingState)
+        if (skeletonFrame.SkeletonData[i].eTrackingState == NUI_SKELETON_TRACKED)
         {
-            // We're tracking the skeleton, draw it
             creatSkeleton(skeletonFrame.SkeletonData[i]);
-			break; // Only process the first tracked skeleton
+            break;
         }
-
     }
 }
 
@@ -242,7 +266,7 @@ void KinectDevice::creatSkeleton(NUI_SKELETON_DATA& skel)
         jd.orientation = MQuaternion(q.x, q.y, -q.z, -q.w);
         jd.rotation = convertToMayaMatrix(matrix);
 		jd.positionKinect = skel.SkeletonPositions[i];
-
+        jd.trackingState = skel.eSkeletonPositionTrackingState[i];
         joints.push_back(jd);
     }
     calculateQuaternion();
@@ -463,185 +487,206 @@ MMatrix KinectDevice::rotZ(double rad)
 
 void KinectDevice::calculateQuaternion()
 {
+    const double DEG = PI / 180.0;
+    if (joints.size() != NUI_SKELETON_POSITION_COUNT)
+        return;
 
-    // Store last stable cross result per call-site (one shared fallback
-    // is fine because stableCross is always called sequentially).
-    const float MAX_STABLE_DOT = 0.9f;
-    MVector lastStable(0.0, 0.0, 1.0);
-
-    auto stableCross = [&](const MVector& a, const MVector& b) -> MVector
-        {
-            MVector na = a.normal();
-            MVector nb = b.normal();
-            if (std::fabs(na * nb) > MAX_STABLE_DOT)   // MVector::operator* = dot
-            {
-                return lastStable;
-            }
-            lastStable = na ^ nb;                        // MVector::operator^ = cross
-            return lastStable;
+    auto boneVec = [&](int from, int to) {
+        return joints[to].position - joints[from].position;
+        };
+    auto tracked = [&](int joint) {
+        return joints[joint].trackingState == NUI_SKELETON_POSITION_TRACKED;
+        };
+    auto storeQuat = [&](int joint, MQuaternion value) {
+        value.normalizeIt();
+        lastWorldQuats[joint] = value;
+        joints[joint].quat.x = static_cast<float>(value.x);
+        joints[joint].quat.y = static_cast<float>(value.y);
+        joints[joint].quat.z = static_cast<float>(value.z);
+        joints[joint].quat.w = static_cast<float>(value.w);
+        };
+    auto applyJointRot = [&](int joint, const MVector& vx, const MVector& vy,
+        const MMatrix& bindInverse) {
+            if (vx.length() < 1e-6 || vy.length() < 1e-6
+                || (vx.normal() ^ vy.normal()).length() < 1e-6)
+                return;
+            storeQuat(joint, matToQuat(bindInverse * mat3FromAxis(vx, vy)));
         };
 
-    // Bone direction vector from two Kinect joint positions
-    auto boneVec = [&](NUI_SKELETON_POSITION_INDEX from,
-        NUI_SKELETON_POSITION_INDEX to) -> MVector
-        {
-            const auto& p1 = joints[from].position;
-            const auto& p2 = joints[to].position;
-            return MVector(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
-        };
+    for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i)
+        storeQuat(i, lastWorldQuats[i]);
 
-    auto storeQuat = [&](NUI_SKELETON_POSITION_INDEX joint, const MQuaternion& q)
-        {
-            joints[joint].quat.x = static_cast<float>(q.x);
-            joints[joint].quat.y = static_cast<float>(q.y);
-            joints[joint].quat.z = static_cast<float>(q.z);
-            joints[joint].quat.w = static_cast<float>(q.w);
-        };
+    const MMatrix bindNone = MMatrix::identity;
+    const MMatrix bindArmL = rotZ(-PI / 2.0);
+    const MMatrix bindArmR = rotZ(PI / 2.0);
+    const MMatrix bindLeg = rotZ(-PI);
+    const MMatrix bindAnkle = rotX(-PI / 2.0);
 
-    auto applyJointRot = [&](NUI_SKELETON_POSITION_INDEX joint,
-        const MVector& vx, const MVector& vy,
-        const MMatrix& bindInverse)
-        {
-            MMatrix boneMat = mat3FromAxis(vx, vy);
-            MMatrix finalMat = bindInverse * boneMat;   // row-major: bindInv first
-            storeQuat(joint, matToQuat(finalMat));
-        };
-
-    const MMatrix inverseBindPoseNone = MMatrix::identity;
-    const MMatrix inverseBindPoseArmL = rotZ(-PI / 2.0);   // inverse of rotZ(+π/2)
-    const MMatrix inverseBindPoseArmR = rotZ(PI / 2.0);   // inverse of rotZ(-π/2)
-    const MMatrix inverseBindPoseLeg = rotZ(-PI);          // inverse of rotZ(π)  = rotZ(-π)
-    const MMatrix inverseBindPoseAnkle = rotX(-PI / 2.0);   // inverse of rotX(+π/2)
-
-
-    // Knee-bend disambiguation: vx must point backward relative to body
-    auto kneeVx = [&](NUI_SKELETON_POSITION_INDEX upper,
-        NUI_SKELETON_POSITION_INDEX mid,
-        NUI_SKELETON_POSITION_INDEX lower,
-        const MVector& bodyX) -> MVector
-        {
-            MVector v1 = boneVec(upper, mid);
-            MVector v2 = boneVec(mid, lower);
-            MVector vx = -(stableCross(v1, v2));        // negate: knees bend backward
-            if ((bodyX.normal() * vx.normal()) > 0.0)   //still forward
-            {
-                vx = -vx;
-            }
-            return vx;
-        };
-
-    // TORSO CHAIN
     MVector hipAxis = boneVec(NUI_SKELETON_POSITION_HIP_LEFT,
         NUI_SKELETON_POSITION_HIP_RIGHT);
+    MVector shoulderAxis = boneVec(NUI_SKELETON_POSITION_SHOULDER_LEFT,
+        NUI_SKELETON_POSITION_SHOULDER_RIGHT);
+    if (hipAxis.length() < 1e-5 || shoulderAxis.length() < 1e-5)
+        return;
+    hipAxis.normalize();
+    shoulderAxis.normalize();
 
-    applyJointRot(NUI_SKELETON_POSITION_HIP_CENTER,
-        hipAxis,
-        boneVec(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE),
-        inverseBindPoseNone);
+    applyJointRot(NUI_SKELETON_POSITION_HIP_CENTER, hipAxis,
+        boneVec(NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE), bindNone);
+    applyJointRot(NUI_SKELETON_POSITION_SPINE, hipAxis + shoulderAxis,
+        boneVec(NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_SHOULDER_CENTER), bindNone);
+    applyJointRot(NUI_SKELETON_POSITION_SHOULDER_CENTER, shoulderAxis,
+        boneVec(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_HEAD), bindNone);
+    storeQuat(NUI_SKELETON_POSITION_HEAD, lastWorldQuats[NUI_SKELETON_POSITION_SHOULDER_CENTER]);
 
-    MVector v_body_x = hipAxis;   // saved for knee disambiguation
-
-    applyJointRot(NUI_SKELETON_POSITION_SPINE,
-        hipAxis,
-        boneVec(NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_SHOULDER_CENTER),
-        inverseBindPoseNone);
-
-    applyJointRot(NUI_SKELETON_POSITION_SHOULDER_CENTER,
-        hipAxis,
-        boneVec(NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_HEAD),
-        inverseBindPoseNone);
-
-    // HEAD copies shoulder-center
-    joints[NUI_SKELETON_POSITION_HEAD].quat =
-        joints[NUI_SKELETON_POSITION_SHOULDER_CENTER].quat;
-
-
-    // LEFT ARM
+    MVector torsoY = boneVec(NUI_SKELETON_POSITION_SPINE,
+        NUI_SKELETON_POSITION_SHOULDER_CENTER);
+    MVector pelvisY = boneVec(NUI_SKELETON_POSITION_HIP_CENTER,
+        NUI_SKELETON_POSITION_SPINE);
+    if (torsoY.length() < 1e-5 || pelvisY.length() < 1e-5)
     {
-        MVector v1, v2;
-
-        v1 = boneVec(NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_SHOULDER_LEFT, stableCross(v1, v2), v1, inverseBindPoseArmL);
-
-        v1 = boneVec(NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT);
-        v2 = boneVec(NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_ELBOW_LEFT, stableCross(v1, v2), v1, inverseBindPoseArmL);
-
-        v1 = boneVec(NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT);
-        v2 = boneVec(NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_WRIST_LEFT, stableCross(v1, v2), v2, inverseBindPoseArmL); // vy=v2
-
-        joints[NUI_SKELETON_POSITION_HAND_LEFT].quat =
-            joints[NUI_SKELETON_POSITION_WRIST_LEFT].quat;
+        return;
     }
 
-    // RIGHT ARM  (cross order flipped for mirror: stableCross(v2,v1))
+    torsoY.normalize();
+    pelvisY.normalize();
+    MVector torsoX = orthoTo(shoulderAxis, torsoY);
+    MVector pelvisX = orthoTo(hipAxis, pelvisY);
+    if (torsoX.length() < 1e-5 || pelvisX.length() < 1e-5)
     {
-        MVector v1, v2;
-
-        v1 = boneVec(NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_SHOULDER_RIGHT, stableCross(v2, v1), v1, inverseBindPoseArmR);
-
-        v1 = boneVec(NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT);
-        v2 = boneVec(NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_ELBOW_RIGHT, stableCross(v2, v1), v1, inverseBindPoseArmR);
-
-        v1 = boneVec(NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT);
-        v2 = boneVec(NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_WRIST_RIGHT, stableCross(v2, v1), v2, inverseBindPoseArmR); // vy=v2
-
-        joints[NUI_SKELETON_POSITION_HAND_RIGHT].quat =
-            joints[NUI_SKELETON_POSITION_WRIST_RIGHT].quat;
+        return;
     }
 
-    // LEFT LEG
-    {
-        MVector v1, v2;
+    torsoX.normalize();
+    pelvisX.normalize();
 
-        v1 = boneVec(NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_HIP_LEFT,
-            kneeVx(NUI_SKELETON_POSITION_HIP_LEFT,
-                NUI_SKELETON_POSITION_KNEE_LEFT,
-                NUI_SKELETON_POSITION_ANKLE_LEFT, v_body_x),
-            v1, inverseBindPoseLeg);
+    auto solveArm = [&](double side, int shoulder, int elbow, int wrist, int hand,
+        const MMatrix& bind, MVector& lastVx) {
+            const MVector upper = boneVec(shoulder, elbow);
+            const MVector forearm = boneVec(elbow, wrist);
+            if (upper.length() < 1e-5 || forearm.length() < 1e-5)
+            {
+                return;
+            }
 
-        v1 = boneVec(NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_KNEE_LEFT, stableCross(v1, v2), v1, inverseBindPoseLeg);
+            const MVector upperDir = upper.normal();
+            const MVector forearmDir = forearm.normal();
 
-        v1 = boneVec(NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
-        applyJointRot(NUI_SKELETON_POSITION_ANKLE_LEFT, stableCross(v1, v2), v2, inverseBindPoseAnkle); // vy=v2
+            const MVector restDir = torsoX * -side;
+            const MVector restVx = torsoY * side;
+            MVector vx = (upperDir * restDir > -0.95)
+                ? restVx.rotateBy(MQuaternion(restDir, upperDir))
+                : lastVx;
+            vx = orthoTo(vx, upperDir);
+            if (vx.length() < 1e-5)
+            {
+                vx = orthoTo(lastVx, upperDir);
+            }
+            if (vx.length() < 1e-5)
+            {
+                return;
+            }
+            vx.normalize();
 
-        joints[NUI_SKELETON_POSITION_FOOT_LEFT].quat =
-            joints[NUI_SKELETON_POSITION_ANKLE_LEFT].quat;
-    }
+            const MVector bendNormal = (side > 0.0) ? (upper ^ forearm) : (forearm ^ upper);
+            const double blend = smoothstep(25.0 * DEG, 50.0 * DEG, upperDir.angle(forearmDir));
+            if (blend > 0.0 && bendNormal.length() > 1e-6)
+            {
+                MVector normal = orthoTo(bendNormal.normal(), upperDir).normal();
+                // only keeps the twist continuous; the bend itself comes from the measured forearm
+                if (normal * vx < 0.0)
+                {
+                    normal = -normal;
+                }
+                vx = rotateAround(vx, upperDir, blend * signedAngle(vx, normal, upperDir));
+            }
+            lastVx = vx;
 
-    // RIGHT LEG
-    {
-        MVector v1, v2;
+            applyJointRot(shoulder, vx, upperDir, bind);
+            applyJointRot(elbow, vx, forearmDir, bind);
 
-        v1 = boneVec(NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_HIP_RIGHT,
-            kneeVx(NUI_SKELETON_POSITION_HIP_RIGHT,
-                NUI_SKELETON_POSITION_KNEE_RIGHT,
-                NUI_SKELETON_POSITION_ANKLE_RIGHT, v_body_x),
-            v1, inverseBindPoseLeg);
+            MVector handDir = forearmDir;
+            if (tracked(wrist) && tracked(hand))
+            {
+                const MVector measuredHand = boneVec(wrist, hand);
+                const MVector axis = forearmDir ^ measuredHand;
+                if (measuredHand.length() > 1e-5 && axis.length() > 1e-6)
+                {
+                    handDir = rotateAround(forearmDir, axis.normal(),
+                        (std::min)(forearmDir.angle(measuredHand), 60.0 * DEG));
+                }
+            }
+            applyJointRot(wrist, vx, handDir, bind);
+            storeQuat(hand, lastWorldQuats[wrist]);
+        };
 
-        v1 = boneVec(NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_KNEE_RIGHT, stableCross(v1, v2), v1, inverseBindPoseLeg);
+    auto solveLeg = [&](int hip, int knee, int ankle, int foot, MVector& lastVx) {
+        const MVector thigh = boneVec(hip, knee);
+        const MVector shank = boneVec(knee, ankle);
+        if (thigh.length() < 1e-5 || shank.length() < 1e-5)
+        {
+            return;
+        }
 
-        v1 = boneVec(NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT);
-        v2 = boneVec(NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
-        applyJointRot(NUI_SKELETON_POSITION_ANKLE_RIGHT, stableCross(v1, v2), v2, inverseBindPoseAnkle); // vy=v2
+        const MVector thighDir = thigh.normal();
+        const MVector shankDir = shank.normal();
 
-        joints[NUI_SKELETON_POSITION_FOOT_RIGHT].quat =
-            joints[NUI_SKELETON_POSITION_ANKLE_RIGHT].quat;
-    }
+        MVector vx = orthoTo(-pelvisX, thighDir);
+        vx = (vx.length() > 0.2) ? vx.normal() : lastVx;
+        lastVx = vx;
+
+        applyJointRot(hip, vx, thighDir, bindLeg);
+        applyJointRot(knee, vx, shankDir, bindLeg);
+
+        MVector footDir = vx ^ shankDir;
+        if (footDir.length() < 1e-5)
+            return;
+        footDir.normalize();
+        if (tracked(ankle) && tracked(foot))
+        {
+            const MVector measuredFoot = boneVec(ankle, foot);
+            const MVector axis = footDir ^ measuredFoot;
+            if (measuredFoot.length() > 1e-5 && axis.length() > 1e-6)
+            {
+                footDir = rotateAround(footDir, axis.normal(),
+                    (std::min)(footDir.angle(measuredFoot), 40.0 * DEG));
+            }
+        }
+        applyJointRot(ankle, -vx, footDir, bindAnkle);
+        storeQuat(foot, lastWorldQuats[ankle]);
+    };
+
+    solveArm(+1.0, NUI_SKELETON_POSITION_SHOULDER_LEFT,
+        NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT,
+        NUI_SKELETON_POSITION_HAND_LEFT, bindArmL, lastArmVx[0]);
+    solveArm(-1.0, NUI_SKELETON_POSITION_SHOULDER_RIGHT,
+        NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT,
+        NUI_SKELETON_POSITION_HAND_RIGHT, bindArmR, lastArmVx[1]);
+    solveLeg(NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT,
+        NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT,
+        lastLegVx[0]);
+    solveLeg(NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT,
+        NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT,
+        lastLegVx[1]);
 }
+
+
+
+MQuaternion KinectDevice::getLocalQuat(int idx) const
+{
+    const Vector4& child = joints[idx].quat;
+    MQuaternion childQ(child.x, child.y, child.z, child.w);
+    if (idx == NUI_SKELETON_POSITION_HIP_CENTER)
+    {
+        return childQ;
+    }
+
+    const Vector4& parent = joints[parent_joint_map[idx]].quat;
+    MQuaternion parentQ(parent.x, parent.y, parent.z, parent.w);
+    return childQ * parentQ.inverse();
+}
+
+
 
 KinectDevice::~KinectDevice()
 {
