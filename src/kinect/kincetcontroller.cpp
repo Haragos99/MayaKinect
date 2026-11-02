@@ -59,6 +59,25 @@ void KinectController::stop()
 	kinect.shutdownKinect();
 }
 
+bool KinectController::isRotationFilterEnabled() const
+{
+	return rotationFilterEnabled;
+}
+
+void KinectController::setRotationFilterEnabled(bool enabled)
+{
+	if (rotationFilterEnabled == enabled)
+	{
+		return;
+	}
+
+	rotationFilterEnabled = enabled;
+	for (auto& filter : rotFilters)
+	{
+		filter.reset();
+	}
+}
+
 void KinectController::updateMayaSkeleton()
 {
 	kinect.processSkeleton();
@@ -67,13 +86,17 @@ void KinectController::updateMayaSkeleton()
 	if (joints.size() != NUI_SKELETON_POSITION_COUNT)
 	{
 		if (++lostFrames == 15)
-			for (auto& filter : rotFilters) filter.reset();
+		{
+			for (auto& filter : rotFilters)
+			{
+				filter.reset();
+			}
+		}
 		return;
 	}
 	lostFrames = 0;
 
-	// turn on only after the unfiltered pose matches the green skeleton
-	constexpr bool useRotationFilter = false;
+	
 	const double dt = std::clamp(kinect.getFrameDt(), 1.0 / 120.0, 0.1);
 	auto& kinectToMayaMap = kinect.getKinectToMayaMap();
 	auto& jointMap = skeleton.getJointMap();
@@ -86,7 +109,6 @@ void KinectController::updateMayaSkeleton()
 			continue;
 		}
 		const std::string& jointName = nameIt->second;
-
 
 		// Skip foot joints to prevent unnatural leg twisting
 		if (jointName == "AnkleRight" || jointName == "AnkleLeft" ||
@@ -105,7 +127,7 @@ void KinectController::updateMayaSkeleton()
 		MQuaternion q = kinect.getLocalQuat(i);
 		q.normalizeIt();
 
-		if (useRotationFilter)
+		if (rotationFilterEnabled)
 		{
 			RotFilterConfig config = torsoCfg;
 			if (jointName.find("Shoulder") != std::string::npos ||
@@ -129,7 +151,7 @@ void KinectController::updateMayaSkeleton()
 
 			q = rotFilters[i].update(q, dt, config);
 		}
-
+		
 		if (i == NUI_SKELETON_POSITION_HIP_CENTER)
 		{
 			transform.setTranslation(joints[i].position * 100.0, MSpace::kTransform);

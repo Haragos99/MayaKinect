@@ -11,6 +11,7 @@ MStatus initializePlugin(MObject obj)
 {
     MFnPlugin plugin(obj, "Gergo Haragos", "1.0", "Any");
     plugin.registerCommand("runMayaKinect", MayaKinectCmd::creator);
+    plugin.registerCommand("setKinectRotationFilter", SetKinectRotationFilterCmd::creator);
     plugin.registerCommand("updateMayaKinect", KinectUpdateSkeletonCmd::creator);
     plugin.registerCommand("closeKinect", CloseKinectCmd::creator);
     plugin.registerCommand("importCharacter", ImportCharacterCmd::creator);
@@ -22,6 +23,7 @@ MStatus uninitializePlugin(MObject obj)
     MFnPlugin plugin(obj);
 
     plugin.deregisterCommand("runMayaKinect");
+    plugin.deregisterCommand("setKinectRotationFilter");
     plugin.deregisterCommand("updateMayaKinect");
     plugin.deregisterCommand("closeKinect");
     plugin.deregisterCommand("importCharacter");

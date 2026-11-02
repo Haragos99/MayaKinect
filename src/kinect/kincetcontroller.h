@@ -26,6 +26,8 @@ public:
 	bool getImageBuffer(unsigned char* outbuffer);
 
 	void stop();
+	bool isRotationFilterEnabled() const;
+	void setRotationFilterEnabled(bool enabled);
 	void createSkeleton();
 	void createDebugSpheres();
 	void updateDebugSpheres();
@@ -37,7 +39,8 @@ private:
 	SkeletonBuilder skeleton; // responsable for the maya skeleton
 	KinectDevice kinect; // responble the kinnect
 	MObjectArray debugSpheres;
-	int lostFrames;
+	int lostFrames = 0;
+	bool rotationFilterEnabled = true;
 	std::array<JointRotFilter, NUI_SKELETON_POSITION_COUNT> rotFilters{};
 	std::chrono::steady_clock::time_point lastUpdateTs{};
 	bool hasLastUpdateTs = false;

@@ -24,6 +24,9 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         self.start_btn = QtWidgets.QPushButton("Start Stream")
         self.stop_btn = QtWidgets.QPushButton("Stop Stream")
         self.import_btn = QtWidgets.QPushButton("Import Model")
+        self.rotation_filter_checkbox = QtWidgets.QCheckBox("Rotation filter")
+        self.rotation_filter_checkbox.setChecked(True)
+        self.rotation_filter_checkbox.setEnabled(False)
         
         # Styling buttons for visibility
         self.start_btn.setMinimumHeight(40)
@@ -34,6 +37,7 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         self.control_layout.addWidget(self.start_btn)
         self.control_layout.addWidget(self.stop_btn)
         self.control_layout.addWidget(self.import_btn)
+        self.control_layout.addWidget(self.rotation_filter_checkbox)
         
         # --- Right Side: Image Feed ---
         self.image_container = QtWidgets.QWidget()
@@ -67,6 +71,7 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         self.start_btn.clicked.connect(self.start_stream)
         self.stop_btn.clicked.connect(self.stop_stream)
         self.import_btn.clicked.connect(self.import_model)
+        self.rotation_filter_checkbox.toggled.connect(self.set_rotation_filter)
 
     def start_stream(self):
         if not self.timer.isActive():
@@ -75,10 +80,15 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
             # Try to init hardware
             try:
                 cmds.runMayaKinect()
+                self.rotation_filter_checkbox.setChecked(cmds.setKinectRotationFilter())
+                self.rotation_filter_checkbox.setEnabled(True)
             except Exception as e:
                 self.image_label.setText("Plugin not found or Kinect disconnected!")
 
             print("Kinect Stream Started")
+
+    def set_rotation_filter(self, enabled):
+        cmds.setKinectRotationFilter(int(enabled))
 
     def stop_stream(self):
         if self.timer.isActive():
