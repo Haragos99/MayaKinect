@@ -89,7 +89,8 @@ void KinectController::updateMayaSkeleton()
 
 
 		// Skip foot joints to prevent unnatural leg twisting
-		if (jointName == "AnkleRight" || jointName == "AnkleLeft")
+		if (jointName == "AnkleRight" || jointName == "AnkleLeft" ||
+			jointName == "WristRight" || jointName == "WristLeft")
 		{
 			continue;
 		}

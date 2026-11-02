@@ -294,7 +294,7 @@ bool KinectDevice::getFrame(unsigned char* outBuffer)
 
             if (lockedRect.Pitch != 0) 
             {
-                memcpy(outBuffer, lockedRect.pBits, lockedRect.Pitch * 480);
+				memcpy(outBuffer, lockedRect.pBits, lockedRect.Pitch * 480); // Assuming 640x480 resolution
             }
             texture->UnlockRect(0);
             NuiSensor->NuiImageStreamReleaseFrame(hColorStream, &imageFrame);
@@ -309,13 +309,13 @@ bool KinectDevice::getFrame(unsigned char* outBuffer)
                 NuiTransformSkeletonToDepthImage(joints[j].positionKinect, &fx, &fy, NUI_IMAGE_RESOLUTION_640x480);
                 screenPoints[j].x = static_cast<long>(fx + 0.5f);
                 screenPoints[j].y = static_cast<long>(fy + 0.5f);
-                drawPixel(outBuffer, screenPoints[j].x, screenPoints[j].y, 255, 0, 0, 5);
+                drawPixel(outBuffer, screenPoints[j].x, screenPoints[j].y, 255, 0, 0, pointSize);
             }
 
             auto drawBone = [&](int joint1, int joint2) {
                 drawLine(outBuffer,
                     screenPoints[joint1].x, screenPoints[joint1].y,
-                    screenPoints[joint2].x, screenPoints[joint2].y, 3);
+                    screenPoints[joint2].x, screenPoints[joint2].y, lineThickness);
             };
 
             // Torso
@@ -365,11 +365,11 @@ void KinectDevice::drawPixel(unsigned char* buffer, int x, int y, unsigned char 
                     continue; 
                 }
 
-                int index = (py * 640 + px) * 4;
-                buffer[index] = b;
-                buffer[index + 1] = g;
-                buffer[index + 2] = r;
-                buffer[index + 3] = 255;
+				int index = (py * 640 + px) * 4; // index in RGBA format
+				buffer[index] = b; // blue channel
+				buffer[index + 1] = g; // green channel
+				buffer[index + 2] = r; // red channel
+				buffer[index + 3] = 255; // alpha channel
             }
         }
     }

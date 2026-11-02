@@ -10,5 +10,7 @@ public:
     KinectUpdateSkeletonCmd() = default;
     MStatus doIt(const MArgList& args) override;
     static void* creator() { return new KinectUpdateSkeletonCmd; }
+    private:
+        unsigned char* getPythonImageBuffer(const MString& addressString);
 
 };

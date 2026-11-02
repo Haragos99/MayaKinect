@@ -50,7 +50,10 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         self.splitter.setStretchFactor(1, 4) # Give more space to the image
 
         # --- Kinect Logic Setup ---
-        self.buffer_size = 640 * 480 * 4
+        self.width = 640
+        self.height = 480
+        self.channels = 4
+        self.buffer_size = self.width * self.height * self.channels
         self.image_buffer = ctypes.create_string_buffer(self.buffer_size)
         self.memory_address = str(ctypes.addressof(self.image_buffer))
 
@@ -87,7 +90,7 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
     def update_frame(self):
         if self.timer.isActive():
             # Call C++ command
-            success = cmds.updateMayaKinect(self.memory_address)
+            success = cmds.updateMayaKinect(self.memory_address,  str(self.buffer_size))
             
             if success:
                 q_img = QtGui.QImage(
