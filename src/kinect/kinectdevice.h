@@ -67,6 +67,16 @@ private:
     MMatrix convertToMayaMatrix(const Matrix4& kMat);
     std::vector<MVector> offsets;
     MQuaternion matToQuat(const MMatrix& m);
+    MVector boneVector(int from, int to) const;
+    bool isJointTracked(int joint) const;
+    void storeQuaternion(int joint, MQuaternion value);
+    void applyJointRotation(int joint, const MVector& vx, const MVector& vy,
+        const MMatrix& bindInverse);
+    void solveArm(double side, int shoulder, int elbow, int wrist, int hand,
+        const MVector& torsoX, const MVector& torsoY, const MMatrix& bind,
+        MVector& lastVx);
+    void solveLeg(int hip, int knee, int ankle, int foot, const MVector& pelvisX,
+        const MMatrix& bindLeg, const MMatrix& bindAnkle, MVector& lastVx);
     double frameDt = 1.0 / 30.0;
 
     MVector lastArmVx[2] = { MVector(0, 1, 0), MVector(0, -1, 0) };

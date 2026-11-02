@@ -106,7 +106,7 @@ class KinectMayaPanel(MayaQWidgetDockableMixin, QtWidgets.QWidget):
                 self.image_label.setPixmap(scaled_pixmap)
 
     def import_model(self):
-        cmds.importCharacter(r"C:/Users/Geri/Documents/Projects/CG/MayaKinect/tpose.obj")
+        cmds.importCharacter(r"C:/Users/Geri/Documents/Projects/CG/MayaKinect/models/tpose.obj")
         print("Import Character")
 
 
