@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# --- MayaKinect ---
+# Character models and their thumbnails are part of the project
+!models/*.obj
+!models/thumbnails/*.png
+# Recorded takes are user data
+takes/
+# Local build folder and Visual Studio CMake settings (machine specific)
+build/
+CMakeSettings.json

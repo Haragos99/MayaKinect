@@ -29,11 +29,30 @@ MStatus KinectController::initKinect()
 
 void KinectController::createSkeleton()
 {
-	if (!skeleton.skeletonExists())
+	// An existing skeleton (e.g. from a reopened scene) must be looked up again,
+	// otherwise the joint map stays empty and the stream moves nothing.
+	if (skeleton.skeletonExists() && skeleton.findExistingSkeleton())
 	{
-		MGlobal::displayInfo("Kinect skeleton not found in scene. Creating new skeleton...");
-		skeleton.createSkeleton();
+		return;
 	}
+
+	MGlobal::displayInfo("Kinect skeleton not found in scene. Creating new skeleton...");
+	skeleton.createSkeleton();
+}
+
+MStringArray KinectController::getSkeletonJointNames() const
+{
+	return skeleton.getMayaJointNames();
+}
+
+bool KinectController::isDriveEnabled() const
+{
+	return driveEnabled;
+}
+
+void KinectController::setDriveEnabled(bool enabled)
+{
+	driveEnabled = enabled;
 }
 
 std::map<std::string, MObject>& KinectController::getSkeletonMap()
@@ -80,6 +99,12 @@ void KinectController::setRotationFilterEnabled(bool enabled)
 
 void KinectController::updateMayaSkeleton()
 {
+	// Drive turned off (setKinectDrive 0): leave the joints untouched
+	if (!driveEnabled)
+	{
+		return;
+	}
+
 	kinect.processSkeleton();
 
 	auto& joints = kinect.getLatestJoints();
