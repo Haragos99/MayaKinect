@@ -1,28 +1,30 @@
 #include "skeletonbuilder.h"
-#include <vector>
+#include <maya/MFnTransform.h>
+
+bool SkeletonBuilder::findJoint(const MString& mayaName, MObject& outJoint)
+{
+    MSelectionList sel;
+    if (sel.add(mayaName) != MS::kSuccess || sel.isEmpty())
+    {
+        return false;
+    }
+
+    MObject node;
+    if (sel.getDependNode(0, node) != MS::kSuccess || !node.hasFn(MFn::kJoint))
+    {
+        return false;
+    }
+
+    outJoint = node;
+    return true;
+}
 
 bool SkeletonBuilder::skeletonExists() const
 {
-    static const std::vector<std::string> k_expectedJoints = {
-        "SpineBase", "SpineMid", "SpineShoulder", "Neck", "Head",
-        "ShoulderLeft", "ElbowLeft", "WristLeft", "HandLeft",
-        "ShoulderRight", "ElbowRight", "WristRight", "HandRight",
-        "HipLeft", "KneeLeft", "AnkleLeft", "FootLeft",
-        "HipRight", "KneeRight", "AnkleRight", "FootRight"
-    };
-
-    for (const auto& name : k_expectedJoints)
+    for (const char* name : kJointNames)
     {
-        MSelectionList sel;
-        MStatus status = sel.add(name.c_str());
-        if (status != MS::kSuccess || sel.isEmpty())
-        {
-            return false;
-        }
-
-        MObject node;
-        sel.getDependNode(0, node);
-        if (!node.hasFn(MFn::kJoint))
+        MObject joint;
+        if (!findJoint(mayaName(name), joint))
         {
             return false;
         }
@@ -31,18 +33,58 @@ bool SkeletonBuilder::skeletonExists() const
     return true;
 }
 
+bool SkeletonBuilder::findExistingSkeleton()
+{
+    std::map<std::string, MObject> found;
+    for (const char* name : kJointNames)
+    {
+        MObject joint;
+        if (!findJoint(mayaName(name), joint))
+        {
+            MGlobal::displayWarning("Kinect skeleton is incomplete, missing joint: " + mayaName(name));
+            return false;
+        }
+        found[name] = joint;
+    }
 
+    m_jointMap = std::move(found);
+    MGlobal::displayInfo("Kinect skeleton found in scene.");
+    return true;
+}
 
+MStringArray SkeletonBuilder::getMayaJointNames() const
+{
+    MStringArray names;
+    for (const char* name : kJointNames)
+    {
+        names.append(mayaName(name));
+    }
+    return names;
+}
 
+MObject SkeletonBuilder::findOrCreateGroup()
+{
+    MSelectionList sel;
+    MObject group;
+    if (sel.add(kGroupName) == MS::kSuccess && !sel.isEmpty()
+        && sel.getDependNode(0, group) == MS::kSuccess && group.hasFn(MFn::kTransform))
+    {
+        return group;
+    }
 
-
+    // Default transform (no rotation, scale 1) so the joint orientations stay unchanged
+    MFnTransform groupFn;
+    group = groupFn.create(MObject::kNullObj);
+    groupFn.setName(kGroupName);
+    return group;
+}
 
 void SkeletonBuilder::createSkeleton()
 {
     m_jointMap.clear();
 
     // Root
-    MObject spineBase = createJoint("SpineBase", MObject::kNullObj, MVector(0, 100, 0), 3.14159265358979323846);
+    MObject spineBase = createJoint("SpineBase", findOrCreateGroup(), MVector(0, 100, 0), 3.14159265358979323846);
     m_jointMap["SpineBase"] = spineBase;
 
     MObject spineMid = createJoint("SpineMid", spineBase, MVector(0, 20, 0));
@@ -133,7 +175,13 @@ MObject SkeletonBuilder::createJoint(const MString& name,
         return MObject::kNullObj;
     }
 
-    jointFn.setName(name);
+    const MString wantedName = MString(kPrefix) + name;
+    const MString actualName = jointFn.setName(wantedName);
+    if (actualName != wantedName)
+    {
+        // A node with this name already exists (e.g. a partial skeleton), Maya added a number
+        MGlobal::displayWarning("Joint name already in use, created " + actualName + " instead of " + wantedName);
+    }
 	jointFn.setOrientation(MEulerRotation(0, oriatinAngel, 0));
     jointFn.setTranslation(position, MSpace::kTransform);
 

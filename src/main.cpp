@@ -1,9 +1,9 @@
 #include <maya/MFnPlugin.h>
 #include <maya/MTimerMessage.h>
-#include "cmds/importcharactercmd.h"
 #include "cmds/closekinectcmd.h"
 #include "cmds/kinectupdateskeletoncmd.h"
 #include "cmds/mayakinectcmd.h"
+#include "cmds/skeletoncmds.h"
 
 
 
@@ -14,7 +14,8 @@ MStatus initializePlugin(MObject obj)
     plugin.registerCommand("setKinectRotationFilter", SetKinectRotationFilterCmd::creator);
     plugin.registerCommand("updateMayaKinect", KinectUpdateSkeletonCmd::creator);
     plugin.registerCommand("closeKinect", CloseKinectCmd::creator);
-    plugin.registerCommand("importCharacter", ImportCharacterCmd::creator);
+    plugin.registerCommand("createKinectSkeleton", CreateKinectSkeletonCmd::creator);
+    plugin.registerCommand("setKinectDrive", SetKinectDriveCmd::creator);
     return MS::kSuccess;
 }
 
@@ -26,6 +27,7 @@ MStatus uninitializePlugin(MObject obj)
     plugin.deregisterCommand("setKinectRotationFilter");
     plugin.deregisterCommand("updateMayaKinect");
     plugin.deregisterCommand("closeKinect");
-    plugin.deregisterCommand("importCharacter");
+    plugin.deregisterCommand("createKinectSkeleton");
+    plugin.deregisterCommand("setKinectDrive");
     return MS::kSuccess;
 }

@@ -47,16 +47,16 @@ add_library(MayaKinect SHARED
     "src/cmds/mayakinectcmd.cpp"
     "src/skeleton/skeletonbuilder.h"
     "src/skeleton/skeletonbuilder.cpp"
-    "src/cmds/importcharactercmd.h"
     "src/kinect/kincetcontroller.h"
     "src/kinect/kincetcontroller.cpp"
     "src/cmds/kinectupdateskeletoncmd.h"
     "src/cmds/kinectupdateskeletoncmd.cpp"
     "src/cmds/closekinectcmd.h" 
     "src/cmds/closekinectcmd.cpp" 
-    "src/cmds/importcharactercmd.cpp"
     "src/utilty/rotationfilter.h" 
     "src/utilty/rotationfilter.cpp"
+    "src/cmds/skeletoncmds.h"
+    "src/cmds/skeletoncmds.cpp"
 )
 
 target_include_directories(MayaKinect PRIVATE

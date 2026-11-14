@@ -1,6 +1,7 @@
 #pragma once
 #include "kinectdevice.h"
 #include <maya/MString.h>
+#include <maya/MStringArray.h>
 #include <maya/MObjectArray.h>
 #include <maya/MGlobal.h>
 #include "../skeleton/skeletonbuilder.h"
@@ -29,6 +30,9 @@ public:
 	bool isRotationFilterEnabled() const;
 	void setRotationFilterEnabled(bool enabled);
 	void createSkeleton();
+	MStringArray getSkeletonJointNames() const;
+	bool isDriveEnabled() const;
+	void setDriveEnabled(bool enabled);
 	void createDebugSpheres();
 	void updateDebugSpheres();
 	std::map<std::string, MObject>& getSkeletonMap();
@@ -41,6 +45,7 @@ private:
 	MObjectArray debugSpheres;
 	int lostFrames = 0;
 	bool rotationFilterEnabled = true;
+	bool driveEnabled = true; // false: updateMayaSkeleton() does not touch the joints
 	std::array<JointRotFilter, NUI_SKELETON_POSITION_COUNT> rotFilters{};
 	std::chrono::steady_clock::time_point lastUpdateTs{};
 	bool hasLastUpdateTs = false;
