@@ -370,3 +370,4 @@ takes/
 # Local build folder and Visual Studio CMake settings (machine specific)
 build/
 CMakeSettings.json
+!models/thumbnails/*.jpg

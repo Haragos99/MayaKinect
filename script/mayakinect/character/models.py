@@ -35,16 +35,29 @@ def _load_overrides():
         return {}
 
 
+THUMB_EXTENSIONS = (".png", ".jpg", ".jpeg")
+
+
+def find_thumbnail(obj_path):
+    """Thumbnail for a model: models/thumbnails/<name>.png or <name>.obj.png (also .jpg)."""
+    obj_path = Path(obj_path)
+    for base in (obj_path.stem, obj_path.name):          # "tposeMale", "tposeMale.obj"
+        for ext in THUMB_EXTENSIONS:
+            candidate = paths.THUMBS_DIR / (base + ext)
+            if candidate.exists():
+                return candidate
+    return None
+
+
 def from_path(obj_path, overrides=None):
     """Build a ModelInfo for any .obj file (also outside models/)."""
     obj_path = Path(obj_path)
     name = obj_path.stem
-    thumb = paths.THUMBS_DIR / (name + ".png")
     settings = (overrides or {}).get(name, {})
     return ModelInfo(
         name=name,
         obj=obj_path,
-        thumb=thumb if thumb.exists() else None,
+        thumb=find_thumbnail(obj_path),
         display_name=settings.get("display_name", ""),
         scale=float(settings.get("scale", 1.0)),
         offset=tuple(settings.get("offset", (0.0, 0.0, 0.0))),
