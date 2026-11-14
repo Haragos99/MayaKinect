@@ -57,6 +57,8 @@ add_library(MayaKinect SHARED
     "src/utilty/rotationfilter.cpp"
     "src/cmds/skeletoncmds.h"
     "src/cmds/skeletoncmds.cpp"
+    "src/recording/takerecorder.h"
+    "src/recording/takerecorder.cpp"
 )
 
 target_include_directories(MayaKinect PRIVATE

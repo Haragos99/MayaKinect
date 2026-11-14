@@ -45,6 +45,8 @@ public:
     void calculateQuaternion();
     void initoffsets();
     double getFrameDt() const { return frameDt; }
+    // Timestamp (ms) of the last skeleton frame received from the Kinect
+    int64_t getFrameTimestampMs() const { return lastTimestampMs; }
     MQuaternion getLocalQuat(int idx) const;
     static const int parent_joint_map[NUI_SKELETON_POSITION_COUNT];
     std::vector<MVector>& getOffsets() { return offsets; }
@@ -78,6 +80,7 @@ private:
     void solveLeg(int hip, int knee, int ankle, int foot, const MVector& pelvisX,
         const MMatrix& bindLeg, const MMatrix& bindAnkle, MVector& lastVx);
     double frameDt = 1.0 / 30.0;
+    int64_t lastTimestampMs = 0;
 
 	int pointSize = 5;
 	int lineThickness = 3;

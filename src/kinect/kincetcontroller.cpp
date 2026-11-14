@@ -3,6 +3,9 @@
 #include <maya/MSelectionList.h>
 #include <maya/MDagPath.h>
 
+static_assert(kRecorderJointCount == NUI_SKELETON_POSITION_COUNT,
+	"TakeRecorder joint count must match the Kinect skeleton");
+
 KinectController::KinectController()
 {
 	//skeleton.createSkeleton();
@@ -126,6 +129,11 @@ void KinectController::updateMayaSkeleton()
 	auto& kinectToMayaMap = kinect.getKinectToMayaMap();
 	auto& jointMap = skeleton.getJointMap();
 
+	// What this frame applies to the skeleton; stored when recording
+	const bool recording = recorder.isRecording();
+	FrameSample sample;
+	sample.timestampMs = kinect.getFrameTimestampMs();
+
 	for (int i = 0; i < NUI_SKELETON_POSITION_COUNT; ++i)
 	{
 		auto nameIt = kinectToMayaMap.find(i);
@@ -180,8 +188,24 @@ void KinectController::updateMayaSkeleton()
 		if (i == NUI_SKELETON_POSITION_HIP_CENTER)
 		{
 			transform.setTranslation(joints[i].position * 100.0, MSpace::kTransform);
+			if (recording)
+			{
+				sample.rootTranslation = joints[i].position * 100.0;
+				sample.hasRoot = true;
+			}
 		}
 		transform.setRotation(q, MSpace::kTransform);
+
+		if (recording)
+		{
+			sample.rotations[i] = q;
+			sample.valid.set(i);
+		}
+	}
+
+	if (recording)
+	{
+		recorder.addSample(sample);
 	}
 }
 

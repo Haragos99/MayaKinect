@@ -139,6 +139,7 @@ void KinectDevice::processSkeleton()
     {
         return;
     }
+    lastTimestampMs = skeletonFrame.liTimeStamp.QuadPart;
 
     // EGYETLEN smoothing hívás (dupla helyett)
     const NUI_TRANSFORM_SMOOTH_PARAMETERS smoothParams = {
