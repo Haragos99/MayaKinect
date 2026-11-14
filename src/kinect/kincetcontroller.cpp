@@ -5,6 +5,8 @@
 
 static_assert(kRecorderJointCount == NUI_SKELETON_POSITION_COUNT,
 	"TakeRecorder joint count must match the Kinect skeleton");
+static_assert(kRecorderRootIndex == NUI_SKELETON_POSITION_HIP_CENTER,
+	"TakeRecorder root index must be the Kinect hip center");
 
 KinectController::KinectController()
 {

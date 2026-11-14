@@ -1,14 +1,20 @@
 #pragma once
 #include <maya/MQuaternion.h>
 #include <maya/MVector.h>
+#include <maya/MObject.h>
+#include <maya/MString.h>
 #include <array>
 #include <bitset>
 #include <cstdint>
+#include <map>
+#include <string>
 #include <vector>
 
-// Number of Kinect v1 skeleton joints (NUI_SKELETON_POSITION_COUNT).
-// Checked with a static_assert in kincetcontroller.cpp, so this header doesn't need NuiApi.h.
+// Number of Kinect v1 skeleton joints (NUI_SKELETON_POSITION_COUNT) and the index of the
+// root joint (NUI_SKELETON_POSITION_HIP_CENTER). Checked with static_asserts in
+// kincetcontroller.cpp, so this header doesn't need NuiApi.h.
 constexpr int kRecorderJointCount = 20;
+constexpr int kRecorderRootIndex = 0;
 
 // One Kinect frame as it was applied to the Mocap_* skeleton.
 struct FrameSample
@@ -23,7 +29,7 @@ struct FrameSample
 };
 
 // Collects FrameSamples in memory while recording. Writing them as keyframes
-// happens once at the end, so recording doesn't slow down the live view. (PLAN.md C4)
+// happens once at the end, so recording doesn't slow down the live view
 class TakeRecorder
 {
 public:
@@ -45,6 +51,15 @@ public:
     double getFps() const { return fps; }
     // Recorded duration in seconds (first to last sample).
     double durationSeconds() const;
+
+    // Writes the buffer as animation curves on the skeleton joints.
+    // Returns the number of frames written (0 when the buffer is empty), or -1 on error.
+    int writeCurves(const std::map<std::string, MObject>& jointMap,
+                    const std::map<int, std::string>& kinectToMaya,
+                    MString* outError = nullptr) const;
+
+    // Frame each sample is written to (same rule as writeCurves). Exposed for testing.
+    int frameForSample(size_t index) const;
 
 private:
     std::vector<FrameSample> samples;
