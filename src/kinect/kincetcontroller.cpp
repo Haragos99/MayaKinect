@@ -27,6 +27,7 @@ MStatus KinectController::initKinect()
 
 	MGlobal::displayInfo("Kinect Connected ");
 	createSkeleton();
+	streaming = true;
 	
 	return MS::kSuccess;
 }
@@ -80,7 +81,67 @@ bool KinectController::getImageBuffer(unsigned char* outbuffer)
 
 void KinectController::stop()
 {
+	// Closing the stream during a recording: save the take instead of losing it
+	if (recorder.isRecording())
+	{
+		MString error;
+		const int frames = stopRecording(&error);
+		if (frames >= 0)
+		{
+			MGlobal::displayInfo(MString("Kinect stream closed during recording, take saved: ") + frames + " frames.");
+		}
+		else
+		{
+			MGlobal::displayError("Kinect stream closed during recording, take could not be saved: " + error);
+		}
+	}
+
 	kinect.shutdownKinect();
+	streaming = false;
+}
+
+MStatus KinectController::startRecording(int startFrame, double fps, MString* outError)
+{
+	if (!streaming)
+	{
+		if (outError) *outError = "The Kinect stream is not running. Start the stream first.";
+		return MS::kFailure;
+	}
+	if (recorder.isRecording())
+	{
+		if (outError) *outError = "A recording is already running.";
+		return MS::kFailure;
+	}
+	if (skeleton.getJointMap().empty())
+	{
+		if (outError) *outError = "No Kinect skeleton in the scene.";
+		return MS::kFailure;
+	}
+	if (fps <= 0.0)
+	{
+		if (outError) *outError = "fps must be greater than 0.";
+		return MS::kFailure;
+	}
+
+	recorder.start(startFrame, fps);
+	return MS::kSuccess;
+}
+
+int KinectController::stopRecording(MString* outError)
+{
+	if (!recorder.isRecording())
+	{
+		if (outError) *outError = "No recording is running.";
+		return -1;
+	}
+
+	recorder.stop();
+	const int frames = recorder.writeCurves(skeleton.getJointMap(), kinect.getKinectToMayaMap(), outError);
+	if (frames >= 0)
+	{
+		recorder.clear(); // keys are written, free the buffer
+	}
+	return frames;
 }
 
 bool KinectController::isRotationFilterEnabled() const

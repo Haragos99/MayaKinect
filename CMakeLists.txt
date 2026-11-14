@@ -59,6 +59,8 @@ add_library(MayaKinect SHARED
     "src/cmds/skeletoncmds.cpp"
     "src/recording/takerecorder.h"
     "src/recording/takerecorder.cpp"
+    "src/cmds/recordingcmds.h"
+    "src/cmds/recordingcmds.cpp"
 )
 
 target_include_directories(MayaKinect PRIVATE

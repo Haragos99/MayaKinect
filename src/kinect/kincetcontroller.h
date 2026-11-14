@@ -35,6 +35,13 @@ public:
 	bool isDriveEnabled() const;
 	void setDriveEnabled(bool enabled);
 	TakeRecorder& getRecorder() { return recorder; }
+	bool isStreaming() const { return streaming; }
+	// Starts collecting frames. Fails if the stream isn't running or a recording is already running.
+	MStatus startRecording(int startFrame, double fps, MString* outError = nullptr);
+	// Stops collecting and writes the take as keyframes on the Mocap_* joints.
+	// Returns the number of frames written, or -1 on error.
+	int stopRecording(MString* outError = nullptr);
+	bool isRecording() const { return recorder.isRecording(); }
 	void createDebugSpheres();
 	void updateDebugSpheres();
 	std::map<std::string, MObject>& getSkeletonMap();
@@ -49,6 +56,7 @@ private:
 	bool rotationFilterEnabled = true;
 	bool driveEnabled = true; // false: updateMayaSkeleton() does not touch the joints
 	TakeRecorder recorder;    // collects the applied joint data while recording
+	bool streaming = false;   // true between a successful initKinect() and stop()
 	std::array<JointRotFilter, NUI_SKELETON_POSITION_COUNT> rotFilters{};
 	std::chrono::steady_clock::time_point lastUpdateTs{};
 	bool hasLastUpdateTs = false;
