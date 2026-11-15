@@ -30,6 +30,12 @@ MStatus KinectUpdateSkeletonCmd::doIt(const MArgList& args)
         auto* outBuffer = getPythonImageBuffer(addressString);
 
         auto& controller = KinectController::instance();
+        // No stream (no sensor found, or closed): the Kinect SDK must not be called
+        if (!controller.isStreaming())
+        {
+            setResult(false);
+            return MS::kSuccess;
+        }
         controller.updateMayaSkeleton();
 
         bool status = controller.getImageBuffer(outBuffer);

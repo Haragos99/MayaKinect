@@ -5,6 +5,8 @@ MStatus MayaKinectCmd::doIt(const MArgList&)
 {
 	auto& contoller = KinectController::instance();
 	contoller.initKinect();
+	// true when the Kinect stream started, so the UI can tell a missing sensor apart
+	setResult(contoller.isStreaming());
 	return MS::kSuccess;
 }
 
