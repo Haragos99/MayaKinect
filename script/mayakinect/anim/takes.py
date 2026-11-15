@@ -1,7 +1,7 @@
 """Save and load recorded Kinect takes as JSON files in takes/."""
-
 import datetime
 import json
+import math
 import re
 from pathlib import Path
 
@@ -12,7 +12,8 @@ import maya.mel as mel
 
 from .. import paths, skeleton_def
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+DECIMALS = 6            # 0.000001 deg / cm, far below Kinect precision
 ROTATE_ATTRS = ("rotateX", "rotateY", "rotateZ")
 TRANSLATE_ATTRS = ("translateX", "translateY", "translateZ")
 
@@ -82,6 +83,54 @@ def _curve_for(plug):
     return oma.MFnAnimCurve(curves[0]) if len(curves) else None
 
 
+def _is_rotate(attr):
+    return attr.split(".")[-1].startswith("rotate")
+
+
+def _num(value):
+    """Readable number: int when whole, else rounded; float noise like 1e-18 becomes 0."""
+    if abs(value) < 1e-9:
+        return 0
+    rounded = round(value, DECIMALS)
+    if rounded == int(rounded):
+        return int(rounded)
+    return rounded
+
+
+def _write_curve(attr, keys, to_internal):
+    """Create the anim curve for `attr` from [[frame, value], ...]; to_internal converts values."""
+    plug = _plug(attr)
+    curve_type = oma.MFnAnimCurve.kAnimCurveTA if _is_rotate(attr) else oma.MFnAnimCurve.kAnimCurveTL
+    curve = oma.MFnAnimCurve()
+    curve.create(plug, curve_type)
+    ui_unit = om.MTime.uiUnit()
+    times = om.MTimeArray([om.MTime(k[0], ui_unit) for k in keys])
+    values = om.MDoubleArray([to_internal(k[1]) for k in keys])
+    curve.addKeys(times, values, oma.MFnAnimCurve.kTangentClamped, oma.MFnAnimCurve.kTangentClamped)
+
+
+def _format_take(data):
+    """JSON text: metadata one entry per line, joints grouped, one key per line."""
+    lines = ["{"]
+    for key, value in data.items():
+        if key != "joints":
+            lines.append('  {}: {},'.format(json.dumps(key), json.dumps(value)))
+    lines.append('  "joints": {')
+    joint_items = list(data["joints"].items())
+    for j, (joint, attrs) in enumerate(joint_items):
+        lines.append('    {}: {{'.format(json.dumps(joint)))
+        attr_items = list(attrs.items())
+        for a, (attr, keys) in enumerate(attr_items):
+            lines.append('      {}: ['.format(json.dumps(attr)))
+            key_lines = ["        [{}, {}]".format(json.dumps(f), json.dumps(v)) for f, v in keys]
+            lines.append(",\n".join(key_lines))
+            lines.append("      ]" + ("," if a < len(attr_items) - 1 else ""))
+        lines.append("    }" + ("," if j < len(joint_items) - 1 else ""))
+    lines.append("  }")
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
 # take files
 
 def take_path(name):
@@ -116,21 +165,25 @@ def save_take(name, overwrite=False):
         raise FileExistsError("Take already exists: {}".format(path))
 
     ui_unit = om.MTime.uiUnit()
-    curves = {}
+    joints = {}     # joint -> attr -> [[frame, value], ...], in skeleton order
+    times = []
     for attr in mocap_attrs():
         if not cmds.objExists(attr):
             continue
         curve = _curve_for(_plug(attr))
         if curve is None or curve.numKeys == 0:
             continue
-        curves[attr] = [
-            [round(curve.input(i).asUnits(ui_unit), 4), curve.value(i)]   # frame, internal value
+        convert = math.degrees if _is_rotate(attr) else float
+        keys = [
+            [_num(curve.input(i).asUnits(ui_unit)), _num(convert(curve.value(i)))]
             for i in range(curve.numKeys)
         ]
-    if not curves:
+        joint, attr_name = attr.split(".", 1)
+        joints.setdefault(joint, {})[attr_name] = keys
+        times += [k[0] for k in keys]
+    if not joints:
         raise RuntimeError("No recorded keys on the Mocap joints to save.")
 
-    times = [k[0] for keys in curves.values() for k in keys]
     from ..character import characters   # optional info, avoid a hard dependency at import
     data = {
         "version": FORMAT_VERSION,
@@ -140,14 +193,14 @@ def save_take(name, overwrite=False):
         "start": int(round(min(times))),
         "end": int(round(max(times))),
         "model": characters.active() or "",
-        "units": {"time": "frames", "angle": "rad", "linear": "cm"},
-        "curves": curves,
+        "units": {"time": "frames", "angle": "deg", "linear": "cm"},
+        "joints": joints,
     }
 
     paths.TAKES_DIR.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, separators=(",", ":"))
+        f.write(_format_take(data))
     tmp.replace(path)   # write-then-rename: a crash never leaves a half-written take
     return path
 
@@ -156,6 +209,7 @@ def read_take_info(path):
     """Metadata of a take file without the curves (for the takes list)."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    data.pop("joints", None)
     data.pop("curves", None)
     data["path"] = str(path)
     return data
@@ -179,8 +233,9 @@ def load_take(path):
     """Replace the keys on the Mocap_* joints with the take in `path`. Returns its metadata."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    if data.get("version") != FORMAT_VERSION:
-        raise RuntimeError("Unsupported take version: {}".format(data.get("version")))
+    version = data.get("version")
+    if version not in (1, FORMAT_VERSION):
+        raise RuntimeError("Unsupported take version: {}".format(version))
 
     fps = float(data.get("fps", 30.0))
     if abs(scene_fps() - fps) > 1e-3 and not set_scene_fps(fps):
@@ -190,22 +245,24 @@ def load_take(path):
         cmds.createKinectSkeleton()
     clear_mocap_keys()
 
-    ui_unit = om.MTime.uiUnit()
-    for attr, keys in data["curves"].items():
-        if not cmds.objExists(attr) or not keys:
-            continue
-        plug = _plug(attr)
-        curve_type = (oma.MFnAnimCurve.kAnimCurveTL if attr.split(".")[-1].startswith("translate")
-                      else oma.MFnAnimCurve.kAnimCurveTA)
-        curve = oma.MFnAnimCurve()
-        curve.create(plug, curve_type)
-        times = om.MTimeArray([om.MTime(k[0], ui_unit) for k in keys])
-        values = om.MDoubleArray([k[1] for k in keys])
-        curve.addKeys(times, values, oma.MFnAnimCurve.kTangentClamped, oma.MFnAnimCurve.kTangentClamped)
+    if version == 1:
+        # Old format: flat {"Joint.attr": keys}, values already in internal units (radians)
+        curves = [(attr, keys, float) for attr, keys in data.get("curves", {}).items()]
+    else:
+        curves = []
+        for joint, attrs in data.get("joints", {}).items():
+            for attr_name, keys in attrs.items():
+                attr = "{}.{}".format(joint, attr_name)
+                curves.append((attr, keys, math.radians if _is_rotate(attr) else float))
+
+    for attr, keys, to_internal in curves:
+        if keys and cmds.objExists(attr):
+            _write_curve(attr, keys, to_internal)
 
     start, end = int(data["start"]), int(data["end"])
     cmds.playbackOptions(minTime=start, maxTime=end, animationStartTime=start, animationEndTime=end)
     cmds.currentTime(start)
+    data.pop("joints", None)
     data.pop("curves", None)
     data["path"] = str(path)
     return data
